@@ -1,7 +1,6 @@
 ---
 name: refactor-arch
 description: Analisa uma codebase de backend (qualquer linguagem/framework), audita anti-patterns de arquitetura, segurança e qualidade classificando por severidade (CRITICAL/HIGH/MEDIUM/LOW) com arquivo e linha, e — após confirmação humana — refatora o projeto para o padrão MVC validando que a aplicação continua funcionando. Use quando o usuário pedir auditoria arquitetural, detecção de code smells ou refatoração para MVC.
-disable-model-invocation: true
 ---
 
 # refactor-arch — Auditoria e Refatoração Arquitetural para MVC
