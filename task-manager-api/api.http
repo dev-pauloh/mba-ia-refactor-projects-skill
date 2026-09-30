@@ -1,0 +1,160 @@
+@baseUrl = http://localhost:5000
+
+### Índice da API
+GET {{baseUrl}}/
+
+### Health
+GET {{baseUrl}}/health
+
+# ---------------------------------------------------------------- Tasks
+
+### Listar tasks (com user_name/category_name, sem N+1)
+GET {{baseUrl}}/tasks
+
+### Buscar task por id
+GET {{baseUrl}}/tasks/1
+
+### Task inexistente → 404
+GET {{baseUrl}}/tasks/999
+
+### Pesquisar tasks
+GET {{baseUrl}}/tasks/search?q=a&status=pending
+
+### Pesquisa com prioridade inválida → 400 (antes: 500)
+GET {{baseUrl}}/tasks/search?priority=alta
+
+### Estatísticas
+GET {{baseUrl}}/tasks/stats
+
+### Criar task → 201
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Estudar Claude Code Skills",
+  "description": "Desafio do MBA",
+  "priority": 1,
+  "user_id": 1,
+  "category_id": 1,
+  "due_date": "2026-10-10",
+  "tags": ["mba", "ia"]
+}
+
+### Criar task com prioridade inválida → 400 (antes: 500)
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Teste",
+  "priority": "alta"
+}
+
+### Atualizar task
+PUT {{baseUrl}}/tasks/1
+Content-Type: application/json
+
+{
+  "status": "in_progress",
+  "priority": 2
+}
+
+### Deletar task
+DELETE {{baseUrl}}/tasks/2
+
+# ---------------------------------------------------------------- Usuários
+
+### Listar usuários
+GET {{baseUrl}}/users
+
+### Buscar usuário (sem o hash da senha)
+GET {{baseUrl}}/users/2
+
+### Tasks de um usuário
+GET {{baseUrl}}/users/2/tasks
+
+### Criar usuário comum → 201
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Ana Souza",
+  "email": "ana@email.com",
+  "password": "senhaforte"
+}
+
+### Criar usuário admin sem token → 403 (antes: escalava privilégio)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Intruso",
+  "email": "intruso@email.com",
+  "password": "senhaforte",
+  "role": "admin"
+}
+
+### Atualizar nome do usuário
+PUT {{baseUrl}}/users/2
+Content-Type: application/json
+
+{
+  "name": "Maria S."
+}
+
+### Login como admin (o token é capturado para as próximas requisições)
+# @name login
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "joao@email.com",
+  "password": "1234"
+}
+
+### Deletar usuário sem token → 401
+DELETE {{baseUrl}}/users/3
+
+### Deletar usuário com token de admin → 200 (execute o login antes)
+DELETE {{baseUrl}}/users/3
+Authorization: Bearer {{login.response.body.token}}
+
+# ---------------------------------------------------------------- Relatórios e categorias
+
+### Relatório geral
+GET {{baseUrl}}/reports/summary
+
+### Relatório por usuário
+GET {{baseUrl}}/reports/user/1
+
+### Listar categorias (com task_count)
+GET {{baseUrl}}/categories
+
+### Criar categoria
+POST {{baseUrl}}/categories
+Content-Type: application/json
+
+{
+  "name": "Estudos",
+  "description": "Tarefas do MBA",
+  "color": "#8e44ad"
+}
+
+### Criar categoria com cor inválida → 400
+POST {{baseUrl}}/categories
+Content-Type: application/json
+
+{
+  "name": "Errada",
+  "color": "vermelho"
+}
+
+### Atualizar categoria
+PUT {{baseUrl}}/categories/1
+Content-Type: application/json
+
+{
+  "name": "Backend & APIs"
+}
+
+### Deletar categoria (tasks ficam sem categoria, não órfãs)
+DELETE {{baseUrl}}/categories/4

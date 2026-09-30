@@ -1,0 +1,160 @@
+@baseUrl = http://localhost:5000
+@adminToken = changeme
+
+### Índice da API
+GET {{baseUrl}}/
+
+### Health (sem secret_key, db_path ou debug na resposta)
+GET {{baseUrl}}/health
+
+# ---------------------------------------------------------------- Produtos
+
+### Listar produtos
+GET {{baseUrl}}/produtos
+
+### Buscar produtos com filtros
+GET {{baseUrl}}/produtos/busca?q=Mouse&categoria=informatica&preco_min=10&preco_max=500
+
+### Buscar produto por id
+GET {{baseUrl}}/produtos/1
+
+### Produto inexistente → 404
+GET {{baseUrl}}/produtos/999
+
+### Criar produto → 201
+POST {{baseUrl}}/produtos
+Content-Type: application/json
+
+{
+  "nome": "Livro Clean Architecture",
+  "descricao": "Robert C. Martin",
+  "preco": 129.9,
+  "estoque": 20,
+  "categoria": "livros"
+}
+
+### Criar produto com preço inválido → 400 (antes: 500)
+POST {{baseUrl}}/produtos
+Content-Type: application/json
+
+{
+  "nome": "Produto X",
+  "preco": "abc",
+  "estoque": 1
+}
+
+### Atualizar produto (mesma validação da criação)
+PUT {{baseUrl}}/produtos/11
+Content-Type: application/json
+
+{
+  "nome": "Livro Clean Architecture (2ª ed.)",
+  "preco": 139.9,
+  "estoque": 15,
+  "categoria": "livros"
+}
+
+### Deletar produto
+DELETE {{baseUrl}}/produtos/11
+
+# ---------------------------------------------------------------- Usuários
+
+### Listar usuários (campo senha não é mais retornado)
+GET {{baseUrl}}/usuarios
+
+### Buscar usuário por id
+GET {{baseUrl}}/usuarios/1
+
+### Criar usuário (senha gravada com hash)
+POST {{baseUrl}}/usuarios
+Content-Type: application/json
+
+{
+  "nome": "Ana Souza",
+  "email": "ana@email.com",
+  "senha": "senhaforte"
+}
+
+### Login → 200
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "admin@loja.com",
+  "senha": "admin123"
+}
+
+### Login com SQL Injection → 401 (antes: autenticava)
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "admin@loja.com' OR '1'='1",
+  "senha": "x' OR '1'='1"
+}
+
+# ---------------------------------------------------------------- Pedidos
+
+### Criar pedido → 201 (baixa estoque em transação)
+POST {{baseUrl}}/pedidos
+Content-Type: application/json
+
+{
+  "usuario_id": 2,
+  "itens": [
+    { "produto_id": 2, "quantidade": 3 },
+    { "produto_id": 3, "quantidade": 1 }
+  ]
+}
+
+### Pedido com quantidade negativa → 400 (antes: aumentava o estoque)
+POST {{baseUrl}}/pedidos
+Content-Type: application/json
+
+{
+  "usuario_id": 2,
+  "itens": [{ "produto_id": 2, "quantidade": -5 }]
+}
+
+### Listar todos os pedidos (sem N+1)
+GET {{baseUrl}}/pedidos
+
+### Pedidos de um usuário
+GET {{baseUrl}}/pedidos/usuario/2
+
+### Aprovar pedido
+PUT {{baseUrl}}/pedidos/1/status
+Content-Type: application/json
+
+{
+  "status": "aprovado"
+}
+
+### Cancelar pedido (agora devolve o estoque)
+PUT {{baseUrl}}/pedidos/1/status
+Content-Type: application/json
+
+{
+  "status": "cancelado"
+}
+
+# ---------------------------------------------------------------- Administrativo (X-Admin-Token = ADMIN_TOKEN)
+
+### Relatório de vendas sem token → 401
+GET {{baseUrl}}/relatorios/vendas
+
+### Relatório de vendas com token → 200
+GET {{baseUrl}}/relatorios/vendas
+X-Admin-Token: {{adminToken}}
+
+### Executar SQL com token → 403 enquanto ENABLE_ADMIN_SQL=false
+POST {{baseUrl}}/admin/query
+X-Admin-Token: {{adminToken}}
+Content-Type: application/json
+
+{
+  "sql": "SELECT COUNT(*) AS total FROM produtos"
+}
+
+### Resetar banco sem token → 401
+POST {{baseUrl}}/admin/reset-db
