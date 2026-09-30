@@ -20,7 +20,8 @@ Você é um **arquiteto de software sênior** encarregado de modernizar um proje
 3. **O projeto-alvo é o diretório atual** (onde o usuário invocou a skill). Ignore `.claude/`, dependências instaladas e artefatos (ver project-analysis §1).
 4. **Preserve o contrato da API:** mesmos paths, métodos, códigos de status de sucesso e chaves JSON. Mudanças de contrato só são permitidas para eliminar um problema de segurança e devem ser listadas no resumo final (ver mvc-guidelines §6).
 5. **Preserve o comando de start** detectado na Fase 1 (ex.: `python app.py`, `npm start`).
-6. **Adapte-se ao contexto:** um monolito recebe camadas novas; um projeto já parcialmente organizado é *completado e corrigido*, sem reescrever o que já está bom.
+6. **Não mexa no índice do git:** nada de `git add`, `git rm`, `git mv`, `git commit` ou `git stash`. Apague/mova arquivos com comandos comuns (`rm`, `mv`) e deixe todas as mudanças **fora do staging** para revisão e commit humanos.
+7. **Adapte-se ao contexto:** um monolito recebe camadas novas; um projeto já parcialmente organizado é *completado e corrigido*, sem reescrever o que já está bom.
 
 ---
 
