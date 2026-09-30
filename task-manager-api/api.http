@@ -1,4 +1,6 @@
-@baseUrl = http://localhost:5001
+# Porta padrão do projeto. Para rodar junto com o code-smells-project (também 5000),
+# suba com PORT=5001 python app.py e troque a linha abaixo para 5001.
+@baseUrl = http://localhost:5000
 
 ### Índice da API
 GET {{baseUrl}}/
