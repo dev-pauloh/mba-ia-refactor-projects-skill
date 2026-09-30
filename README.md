@@ -103,12 +103,308 @@ Um ponto importante: o **projeto 3 já "parece" organizado**, mas tem os mesmos 
 
 ## B) Construção da Skill
 
-> _Em construção (Etapa 2)._
+### Estrutura
+
+```
+.claude/skills/refactor-arch/
+├── SKILL.md                              # orquestrador: regras invioláveis + 3 fases
+└── references/
+    ├── project-analysis.md               # Fase 1 — heurísticas de detecção de stack/arquitetura
+    ├── anti-patterns-catalog.md          # Fase 2 — 22 anti-patterns + APIs deprecated
+    ├── audit-report-template.md          # Fase 2 — formato do relatório
+    ├── mvc-guidelines.md                 # Fase 3 — arquitetura-alvo e regras de contrato
+    └── refactoring-playbook.md           # Fase 3 — 14 transformações antes/depois
+```
+
+| Área de conhecimento exigida | Arquivo |
+|---|---|
+| Análise de projeto | `project-analysis.md` |
+| Catálogo de anti-patterns | `anti-patterns-catalog.md` |
+| Template de relatório | `audit-report-template.md` |
+| Guidelines de arquitetura | `mvc-guidelines.md` |
+| Playbook de refatoração | `refactoring-playbook.md` |
+
+### Decisões de design
+
+1. **O SKILL.md diz *o quê* e *quando*; as referências dizem *como*.** O SKILL.md tem menos de 100 linhas e manda ler cada referência **só no início da fase que a usa** (*progressive disclosure*). O agente não gasta contexto com o playbook enquanto audita, e o SKILL.md fica abaixo do limite recomendado pela documentação (~5k tokens).
+2. **Regras invioláveis no topo do SKILL.md.** São elas:
+   - Fases 1 e 2 são somente leitura.
+   - Todo finding cita `arquivo:linha` conferido no código.
+   - O contrato da API e o comando de start são preservados.
+   - A skill não mexe no índice do git.
+   - A refatoração se adapta ao nível de organização do projeto.
+3. **Pausa obrigatória com pergunta fixa.** A Fase 2 termina com `Proceed with refactoring (Phase 3)? [y/n]` e a instrução explícita de **não chamar nenhuma ferramenta de escrita** até a resposta.
+4. **Validação por baseline.** Antes de alterar qualquer coisa, a Fase 3 sobe a aplicação original e registra status e chaves JSON de cada endpoint. Depois da refatoração, repete as mesmas requisições e compara. Assim "os endpoints continuam funcionando" vira uma verificação objetiva, e não uma impressão do modelo.
+5. **Mudanças de contrato só por segurança, e sempre documentadas.** As guidelines (§6) listam o que pode mudar: remover campos sensíveis, proteger rotas admin, trocar 500 por 400 em entrada inválida. Cada execução gera `docs/refactor-summary.md` com a seção *Intentional contract changes*.
+6. **IDs cruzados.** O finding `F01` aponta o anti-pattern `AP-02`, que aponta o padrão `PB-02`. Com isso o relatório, o catálogo e o playbook formam uma cadeia rastreável.
+7. **Sem `disable-model-invocation`.** A skill começou com essa opção, mas ela escondia a skill do menu (ver Desafios). A segurança fica garantida pela pausa da Fase 2.
+
+### Anti-patterns do catálogo (22)
+
+| Severidade | Anti-patterns | Por que entraram |
+|---|---|---|
+| CRITICAL (6) | AP-01 Segredos hardcoded · AP-02 SQL Injection · AP-03 God Class/File · AP-04 Senha em texto puro/hash fraco · AP-05 Endpoint admin sem auth · AP-06 Exposição de dados sensíveis | Apareceram na análise manual em pelo menos 2 dos 3 projetos e têm impacto direto em segurança ou na separação de camadas |
+| HIGH (6) | AP-07 Regra de negócio na rota · AP-08 Estado global mutável · AP-09 Acoplamento sem DI · AP-10 Debug/CORS inseguro · AP-11 Callback hell · AP-12 Autenticação falsa | Violações de MVC/SOLID que impedem testes. AP-11 cobre a variante assíncrona do Node |
+| MEDIUM (5) | AP-13 N+1 · AP-14 Sem transação/integridade · AP-15 Duplicação · AP-16 Validação fraca · AP-17 Erros engolidos/espalhados | Performance e consistência de dados, todos presentes nos 3 projetos |
+| LOW (5) | AP-18 Magic numbers · AP-19 Nomes ruins · AP-20 Código morto · AP-21 print/console.log · AP-22 **APIs deprecated** | Legibilidade. AP-22 tem uma tabela por ecossistema (Python, SQLAlchemy, Flask, Werkzeug, Node, Express, Java, PHP) com o equivalente moderno |
+
+Cada entrada tem **sinais de detecção acionáveis** (regex para `grep -nE`), **falsos positivos** a descartar, impacto e o padrão de correção. O playbook tem **14 padrões** (PB-01…PB-14) com código antes/depois em Python e JavaScript.
+
+### Como a skill é agnóstica de tecnologia
+
+- **Detecção por conceito, não por sintaxe.** Estado global mutável aparece como `global db_connection` em Python e como `let globalCache = {}` em JS, e os dois casos estão descritos no mesmo anti-pattern.
+- **A Fase 1 descobre a stack pelos manifestos.** A tabela cobre `requirements.txt`, `package.json`, `pom.xml`, `go.mod`, `composer.json`, `Gemfile` e `*.csproj`. Depois confirma pelos imports.
+- **As guidelines definem a mesma arquitetura com estruturas por stack.** Há estruturas para Flask monolítico, Flask parcialmente organizado e Express, além de mapeamentos para Django, FastAPI e Spring.
+- **Nenhuma referência a nomes dos projetos-alvo** no SKILL.md. Os exemplos do playbook ilustram padrões, não arquivos específicos.
+- **Prova prática:** a **mesma cópia** da skill (verificada com `diff -r`) rodou nos 3 projetos, em duas linguagens e dois níveis de organização.
+
+### Desafios encontrados e como resolvi
+
+| # | Desafio | Solução |
+|---|---|---|
+| 1 | **O regex de segredos não pegava casos reais.** A primeira versão não detectava `app.config["SECRET_KEY"] = "..."` (por causa do `"]` antes do `=`) nem `paymentGatewayKey` (camelCase). | Testei os regex contra os 3 projetos **antes** do commit e reescrevi o padrão para `(secret\|pass\|key\|token\|senha\|chave)\w*["']?\]?\s*[:=]\s*["'][^"']{4,}["']`, que pega os 7 casos. |
+| 2 | **A skill não aparecia no `/refactor`.** | Duas causas. (a) `disable-model-invocation: true` esconde a skill do menu, e eu removi a opção. (b) O Claude estava sendo aberto na **raiz** do repositório: skills em subpastas (`code-smells-project/.claude/skills`) só carregam quando o Claude é aberto dentro delas ou quando mexe em arquivos dali. Diagnostiquei com `claude -p "liste as skills"` rodado dentro do projeto. |
+| 3 | **A skill usou `git rm` no projeto 1.** As remoções ficaram no *staging* e entraram por engano no commit do relatório. | Refiz os commits com `git reset --soft` (ainda locais) e acrescentei a **regra 6** ao SKILL.md: nada de `git add/rm/mv/commit`. Nos projetos 2 e 3 as mudanças ficaram fora do staging, como esperado. |
+| 4 | **Senha com hash quebra o banco antigo.** Trocar texto puro/MD5 por hash seguro faz o login falhar com o `.db` gerado antes. | O playbook (PB-06) e o SKILL.md instruem apagar os bancos locais gerados pelo baseline e rodar o seed de novo. |
+| 5 | **`utcnow()` → `datetime.now(timezone.utc)` gera `TypeError`** ao comparar com datas *naive* do SQLite. | O PB-11 traz um helper `utcnow()` que devolve UTC *naive*. A skill aplicou esse helper no projeto 3, validado com `python -W error::DeprecationWarning seed.py`. |
+| 6 | **Quanto do contrato mudar?** Proteger todas as rotas quebraria os clientes. | Regra §6 das guidelines: só rotas administrativas/destrutivas globais ganham auth. No projeto 3 a skill também protegeu `DELETE /users/<id>`, que apaga o usuário e todas as suas tasks (finding CRITICAL). É uma exceção à regra 6.5, mas a skill justificou e documentou. |
+
+---
 
 ## C) Resultados
 
-> _Em construção (Etapa 3)._
+### Findings por severidade
+
+| Projeto | CRITICAL | HIGH | MEDIUM | LOW | Total | Relatório |
+|---|---|---|---|---|---|---|
+| 1 — code-smells-project | 6 | 5 | 5 | 5 | **21** | [audit-project-1.md](reports/audit-project-1.md) |
+| 2 — ecommerce-api-legacy | 5 | 4 | 4 | 5 | **18** | [audit-project-2.md](reports/audit-project-2.md) |
+| 3 — task-manager-api | 4 | 4 | 5 | 5 | **18** | [audit-project-3.md](reports/audit-project-3.md) |
+
+Nos 3 projetos, os findings da skill incluem **todos** os problemas da análise manual (seção A). A skill ainda achou problemas que eu não tinha listado:
+
+- **P1:** `deletar_produto` deixava itens órfãos e o cancelamento de pedido não devolvia o estoque.
+- **P2:** um `card` numérico derrubava o processo (TypeError dentro do callback do sqlite).
+- **P3:** `POST /users` permitia escalar privilégio com `"role": "admin"`.
+
+### Estrutura antes → depois
+
+**Projeto 1 — monolito → `src/` com camadas**
+```
+ANTES                         DEPOIS
+app.py                        app.py                       (lançador: python app.py)
+controllers.py                src/app.py                   (create_app)
+models.py                     src/config/{settings,constants}.py
+database.py                   src/database/connection.py   (conexão por request em flask.g)
+requirements.txt              src/models/{produto,usuario,pedido,relatorio,admin}_model.py
+                              src/controllers/{produto,usuario,pedido,relatorio,admin,health}_controller.py
+                              src/views/{produto,usuario,pedido,relatorio,admin,health}_routes.py
+                              src/services/notification_service.py
+                              src/middlewares/{error_handler,auth}.py
+                              src/errors.py · .env.example · docs/
+```
+
+**Projeto 2 — God Class → camadas com injeção de dependência**
+```
+ANTES                         DEPOIS
+src/app.js                    src/app.js                   (composition root, npm start)
+src/AppManager.js             src/config/{index,constants}.js
+src/utils.js                  src/database/{connection,schema}.js   (wrapper Promise + transaction)
+                              src/models/{user,course,enrollment,payment,auditLog}Model.js
+                              src/controllers/{checkout,report,user}Controller.js
+                              src/routes/{checkout,admin,user}Routes.js
+                              src/services/paymentService.js
+                              src/middlewares/{asyncHandler,auth,errorHandler}.js
+                              src/utils/{logger,password}.js · src/errors.js · .env.example · docs/
+```
+
+**Projeto 3 — camadas parciais → camadas completas (sem mover tudo)**
+```
+ANTES                         DEPOIS
+app.py                        app.py                       (create_app, python app.py)
+database.py                   database.py
+seed.py                       seed.py
+models/{task,user,category}   models/{task,user,category,base}.py
+routes/{task,user,report}     routes/{task,user,report,category,system}_routes.py   (View)
+services/notification         services/{notification,token}_service.py
+utils/helpers.py              utils/helpers.py             (validadores e helper utcnow usados de fato)
+                              config/{settings,constants}.py              ← novo
+                              controllers/{task,user,report,category}_controller.py  ← novo
+                              middlewares/{error_handler,auth}.py         ← novo
+                              .env.example · docs/
+```
+
+### Checklist de validação
+
+| Item | P1 | P2 | P3 |
+|---|---|---|---|
+| **Fase 1** — Linguagem detectada corretamente | ✅ Python | ✅ JavaScript (Node) | ✅ Python |
+| Framework detectado corretamente | ✅ Flask 3.1.1 | ✅ Express 4.18.2 (4.22.1 instalado) | ✅ Flask 3.0.0 + SQLAlchemy |
+| Domínio descrito corretamente | ✅ E-commerce | ✅ LMS com checkout | ✅ Task Manager |
+| Nº de arquivos condiz | ✅ 4 | ✅ 3 | ✅ 15 |
+| **Fase 2** — Relatório segue o template | ✅ | ✅ | ✅ |
+| Findings com arquivo e linhas exatos | ✅ | ✅ | ✅ |
+| Ordenados CRITICAL → LOW | ✅ | ✅ | ✅ |
+| Mínimo de 5 findings | ✅ 21 | ✅ 18 | ✅ 18 |
+| APIs deprecated verificadas | ✅ nenhuma (correto para Flask 3.1) | ✅ callbacks do sqlite3 (padrão legado) | ✅ `Query.get()`, `datetime.utcnow()` |
+| Pausa e pede confirmação | ✅ | ✅ | ✅ |
+| **Fase 3** — Estrutura MVC | ✅ | ✅ | ✅ |
+| Config extraída (sem hardcoded) | ✅ | ✅ | ✅ |
+| Models abstraem dados | ✅ | ✅ | ✅ |
+| Views/Routes separadas | ✅ `src/views/` | ✅ `src/routes/` | ✅ `routes/` |
+| Controllers concentram o fluxo | ✅ | ✅ | ✅ |
+| Error handling centralizado | ✅ | ✅ | ✅ |
+| Entry point claro | ✅ `app.py` → `create_app()` | ✅ `src/app.js` | ✅ `app.py` → `create_app()` |
+| Aplicação inicia sem erros | ✅ | ✅ | ✅ (sem warnings de deprecated) |
+| Endpoints originais respondem | ✅ 19/19 rotas | ✅ 3/3 rotas | ✅ 22/22 rotas |
+
+### Logs das aplicações rodando após a refatoração
+
+Minha validação foi independente da skill: apaguei o banco, subi o app com o comando de start original e chamei cada rota com `curl`.
+
+**Projeto 1** — `ADMIN_TOKEN=tok123 python app.py`
+```
+SECRET_KEY não definida; usando valor aleatório (apenas desenvolvimento)
+INFO __main__: Servidor iniciado em http://127.0.0.1:5000
+ * Debug mode: off
+GET     /                                -> 200
+GET     /health                          -> 200  {"ambiente":"development","counts":{...},"status":"ok"}   (sem secret_key)
+GET     /produtos                        -> 200
+GET     /produtos/busca?q=Mouse&preco_min=10 -> 200
+GET     /produtos/999                    -> 404  {"erro":"Produto não encontrado","sucesso":false}
+POST    /produtos                        -> 201
+POST    /produtos  (preco "abc")         -> 400  {"erro":"Preço deve ser numérico"}      (antes: 500)
+PUT     /produtos/11                     -> 200
+GET     /usuarios                        -> 200  (sem campo senha)
+POST    /usuarios                        -> 201
+POST    /login                           -> 200
+POST    /login  (' OR '1'='1)            -> 401  (SQL Injection bloqueada)
+POST    /pedidos                         -> 201
+GET     /pedidos · /pedidos/usuario/2    -> 200 · 200
+PUT     /pedidos/1/status                -> 200
+GET     /relatorios/vendas               -> 401 sem token · 200 com X-Admin-Token
+DELETE  /produtos/11                     -> 200
+POST    /admin/query · /admin/reset-db   -> 401 sem token
+POST    /admin/query  (com token)        -> 403  (ENABLE_ADMIN_SQL desligado)
+```
+
+**Projeto 2** — `ADMIN_TOKEN=tok123 npm start`
+```
+> node src/app.js
+[WARN] PAYMENT_GATEWAY_KEY não definida; usando valor aleatório (apenas desenvolvimento)
+[INFO] LMS API rodando na porta 3000
+POST   /api/checkout  (sucesso, api.http)        -> 200  {"msg":"Sucesso","enrollment_id":2}
+POST   /api/checkout  (recusado, api.http)       -> 400  Pagamento recusado
+POST   /api/checkout  (card numérico)            -> 400  Cartão inválido       (antes: derrubava o processo)
+POST   /api/checkout  (curso 99)                 -> 404  Curso não encontrado
+GET    /api/admin/financial-report               -> 401 sem token · 200 com token (mesmo formato de antes)
+DELETE /api/users/1                              -> 401 sem token · 200 com token (remove matrículas/pagamentos juntos)
+[INFO] Processando pagamento de 497 no cartão final 4444    (antes: cartão completo + chave do gateway)
+```
+
+**Projeto 3** — `python seed.py && python app.py`
+```
+python -W error::DeprecationWarning seed.py   →  3 usuários · 4 categorias · 10 tasks   (nenhum warning)
+ * Debug mode: off
+GET    / · /health                    -> 200 · 200
+GET    /tasks · /tasks/1 · /tasks/stats -> 200 · 200 · 200
+GET    /tasks/999                     -> 404
+GET    /tasks/search?q=a&status=pending -> 200
+GET    /tasks/search?priority=x       -> 400  (antes: 500)
+POST   /tasks                         -> 201
+POST   /tasks  (priority "alta")      -> 400  (antes: 500)
+PUT    /tasks/1                       -> 200
+GET    /users · /users/2 · /users/2/tasks -> 200 · 200 · 200   (sem password)
+POST   /users · PUT /users/2          -> 201 · 200
+POST   /login                         -> 200  {"token":"eyJ1aWQiOjJ9.ar1soA...", ...}   (token assinado)
+GET    /reports/summary · /reports/user/1 -> 200 · 200
+GET    /categories · POST · PUT       -> 200 · 201 · 200
+DELETE /tasks/2 · /categories/4       -> 200 · 200
+DELETE /users/3                       -> 401 sem token · 200 com token de admin
+grep: datetime.utcnow = 0 · .query.get( = 0 · hashlib.md5 = 0 · except: = 0 · debug=True = 0
+```
+
+O resumo completo de cada refatoração, com a lista de mudanças de contrato, está em `<projeto>/docs/refactor-summary.md`.
+
+### Como a skill se comportou em stacks diferentes
+
+- **Python monolítico (P1):** criou `src/` com todas as camadas e manteve `app.py` na raiz como lançador, para preservar `python app.py`. Aplicou SQL parametrizado, `werkzeug.security` para as senhas e conexão por requisição em `flask.g`.
+- **Node/Express (P2):** a mudança principal foi o fluxo assíncrono. Criou um wrapper Promise sobre o `sqlite3`, com `transaction()`, e reescreveu o checkout e o relatório com `async/await`, trocando o N+1 por um único `LEFT JOIN`. Para as senhas usou `crypto.scrypt` nativo, sem adicionar dependência. Classificou o uso da API de callbacks como padrão legado, e não como API removida.
+- **Python parcialmente organizado (P3):** não moveu nada para `src/`. Manteve `models/`, `routes/` e `services/`, adicionou `config/`, `controllers/` e `middlewares/` e reaproveitou código morto (`helpers.py`, `Task.is_overdue`) em vez de duplicar. Foi o único projeto com APIs deprecated reais, e ele as substituiu.
+- **O que se repetiu nas 3 stacks:** o mesmo template de relatório, a mesma cadeia F→AP→PB, o mesmo baseline e a mesma comparação antes/depois, e a documentação das mudanças de contrato. Isso mostra que o comportamento vem da skill, e não do projeto.
+
+---
 
 ## D) Como Executar
 
-> _Em construção (Etapa 4)._
+### Pré-requisitos
+
+- [Claude Code](https://code.claude.com/docs) instalado e autenticado (testado com a v2.1.284 e o modelo Opus 5.5)
+- Python 3.12+ com `venv` (projetos 1 e 3)
+- Node.js 18+ e npm (projeto 2, testado com o Node 22)
+- `curl` (usado na validação)
+
+### Executar a skill
+
+A skill fica **dentro de cada projeto** (`<projeto>/.claude/skills/refactor-arch/`). Por isso **abra o Claude Code dentro da pasta do projeto**: aberto na raiz do repositório, ele não encontra a skill.
+
+```bash
+# Projeto 1
+cd code-smells-project
+claude "/refactor-arch"
+
+# Projeto 2
+cd ../ecommerce-api-legacy
+claude "/refactor-arch"
+
+# Projeto 3
+cd ../task-manager-api
+claude "/refactor-arch"
+```
+
+Em cada execução:
+1. **Fase 1** imprime o resumo da stack.
+2. **Fase 2** imprime o relatório e pergunta `Proceed with refactoring (Phase 3)? [y/n]`. Revise e responda `y`.
+3. **Fase 3** salva `docs/audit-report.md`, faz o baseline, refatora, valida e grava `docs/refactor-summary.md`.
+4. Revise as mudanças (`git status`, que devem estar fora do staging) e faça o commit. Copie `docs/audit-report.md` para `reports/audit-project-N.md`.
+
+Para usar a skill em outro projeto, copie a pasta: `cp -r code-smells-project/.claude <outro-projeto>/`.
+
+### Validar que a refatoração funcionou
+
+**Projeto 1**
+```bash
+cd code-smells-project
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+rm -f loja.db                                   # banco antigo tem senhas em texto puro
+ADMIN_TOKEN=tok123 .venv/bin/python app.py &
+curl -s localhost:5000/produtos | head -c 200
+curl -s -X POST localhost:5000/login -H 'Content-Type: application/json' \
+     -d '{"email":"admin@loja.com","senha":"admin123"}'
+curl -s localhost:5000/relatorios/vendas -H 'X-Admin-Token: tok123'
+```
+
+**Projeto 2**
+```bash
+cd ecommerce-api-legacy
+npm install
+ADMIN_TOKEN=tok123 npm start &
+# use as requisições de api.http (a variável @adminToken define o header X-Admin-Token)
+curl -s -X POST localhost:3000/api/checkout -H 'Content-Type: application/json' \
+     -d '{"usr":"Gui","eml":"gui@fullcycle.com.br","pwd":"senhaforte","c_id":2,"card":"4111222233334444"}'
+curl -s localhost:3000/api/admin/financial-report -H 'X-Admin-Token: tok123'
+```
+
+**Projeto 3**
+```bash
+cd task-manager-api
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+rm -f instance/tasks.db && .venv/bin/python seed.py
+.venv/bin/python app.py &
+curl -s localhost:5000/tasks | head -c 200
+curl -s localhost:5000/reports/summary | head -c 200
+curl -s -X POST localhost:5000/login -H 'Content-Type: application/json' \
+     -d '{"email":"joao@email.com","password":"1234"}'
+```
+
+Variáveis de ambiente suportadas por projeto: veja o `.env.example` de cada um (`SECRET_KEY`, `ADMIN_TOKEN`, `PORT`, `CORS_ORIGINS`, …). Sem `SECRET_KEY`, um valor aleatório é gerado a cada boot, só para desenvolvimento.
