@@ -135,7 +135,7 @@ Um ponto importante: o **projeto 3 já "parece" organizado**, mas tem os mesmos 
    - A refatoração se adapta ao nível de organização do projeto.
 3. **Pausa obrigatória com pergunta fixa.** A Fase 2 termina com `Proceed with refactoring (Phase 3)? [y/n]` e a instrução explícita de **não chamar nenhuma ferramenta de escrita** até a resposta.
 4. **Validação por baseline.** Antes de alterar qualquer coisa, a Fase 3 sobe a aplicação original e registra status e chaves JSON de cada endpoint. Depois da refatoração, repete as mesmas requisições e compara. Assim "os endpoints continuam funcionando" vira uma verificação objetiva, e não uma impressão do modelo.
-5. **Mudanças de contrato só por segurança, e sempre documentadas.** As guidelines (§6) listam o que pode mudar: remover campos sensíveis, proteger rotas admin, trocar 500 por 400 em entrada inválida. Cada execução gera `docs/refactor-summary.md` com a seção *Intentional contract changes*.
+5. **Mudanças de contrato só por segurança, e sempre documentadas.** As guidelines (§6) listam o que pode mudar: remover campos sensíveis, exigir autenticação em **toda rota citada num finding CRITICAL** (exceto a de login), trocar 500 por 400 em entrada inválida. Cada execução gera `docs/refactor-summary.md` com a seção *Intentional contract changes*.
 6. **IDs cruzados.** O finding `F01` aponta o anti-pattern `AP-02`, que aponta o padrão `PB-02`. Com isso o relatório, o catálogo e o playbook formam uma cadeia rastreável.
 7. **Sem `disable-model-invocation`.** A skill começou com essa opção, mas ela escondia a skill do menu (ver Desafios). A segurança fica garantida pela pausa da Fase 2.
 
@@ -167,7 +167,8 @@ Cada entrada tem **sinais de detecção acionáveis** (regex para `grep -nE`), *
 | 3 | **A skill usou `git rm` no projeto 1.** As remoções ficaram no *staging* e entraram por engano no commit do relatório. | Refiz os commits com `git reset --soft` (ainda locais) e acrescentei a **regra 6** ao SKILL.md: nada de `git add/rm/mv/commit`. Nos projetos 2 e 3 as mudanças ficaram fora do staging, como esperado. |
 | 4 | **Senha com hash quebra o banco antigo.** Trocar texto puro/MD5 por hash seguro faz o login falhar com o `.db` gerado antes. | O playbook (PB-06) e o SKILL.md instruem apagar os bancos locais gerados pelo baseline e rodar o seed de novo. |
 | 5 | **`utcnow()` → `datetime.now(timezone.utc)` gera `TypeError`** ao comparar com datas *naive* do SQLite. | O PB-11 traz um helper `utcnow()` que devolve UTC *naive*. A skill aplicou esse helper no projeto 3, validado com `python -W error::DeprecationWarning seed.py`. |
-| 6 | **Quanto do contrato mudar?** Proteger todas as rotas quebraria os clientes. | Regra §6 das guidelines: só rotas administrativas/destrutivas globais ganham auth. No projeto 3 a skill também protegeu `DELETE /users/<id>`, que apaga o usuário e todas as suas tasks (finding CRITICAL). É uma exceção à regra 6.5, mas a skill justificou e documentou. |
+| 6 | **Quanto do contrato mudar?** Proteger todas as rotas quebraria os clientes. | Regra §6 das guidelines: rotas citadas em findings CRITICAL ganham autenticação (ver desafio 7). As demais seguem públicas e são registradas como recomendação residual. |
+| 7 | **Feedback do avaliador: rotas CRITICAL sem autenticação.** Na primeira execução do projeto 3, o F04 (CRITICAL) citava `DELETE /tasks/<id>` e `DELETE /categories/<id>`, mas a regra 6.5 das guidelines tratava CRUD comum como público e só o `DELETE /users` foi protegido. A regra contradizia o próprio relatório. | Reescrevi a regra (§6.2): **toda rota citada num finding CRITICAL recebe autenticação**, com uma única exceção, a rota que emite a credencial (login). O template passou a exigir a linha `Routes:` em todo finding CRITICAL, e a validação da Fase 3 testa cada rota citada sem e com token, reprovando se alguma ficar aberta. Restaurei o projeto 3 ao código legado e rodei a skill de novo: 12/12 rotas citadas protegidas (401 sem token). Os projetos 1 e 2 foram executados com a versão anterior da regra; a nova execução pedida pelo avaliador foi a do projeto 3. |
 
 ---
 
@@ -179,7 +180,7 @@ Cada entrada tem **sinais de detecção acionáveis** (regex para `grep -nE`), *
 |---|---|---|---|---|---|---|
 | 1 — code-smells-project | 6 | 5 | 5 | 5 | **21** | [audit-project-1.md](reports/audit-project-1.md) |
 | 2 — ecommerce-api-legacy | 5 | 4 | 4 | 5 | **18** | [audit-project-2.md](reports/audit-project-2.md) |
-| 3 — task-manager-api | 4 | 4 | 5 | 5 | **18** | [audit-project-3.md](reports/audit-project-3.md) |
+| 3 — task-manager-api | 5 | 5 | 6 | 4 | **20** | [audit-project-3.md](reports/audit-project-3.md) |
 
 Nos 3 projetos, os findings da skill incluem **todos** os problemas da análise manual (seção A). A skill ainda achou problemas que eu não tinha listado:
 
@@ -224,12 +225,12 @@ ANTES                         DEPOIS
 app.py                        app.py                       (create_app, python app.py)
 database.py                   database.py
 seed.py                       seed.py
-models/{task,user,category}   models/{task,user,category,base}.py
+models/{task,user,category}   models/{task,user,category}.py
 routes/{task,user,report}     routes/{task,user,report,category,system}_routes.py   (View)
 services/notification         services/{notification,token}_service.py
 utils/helpers.py              utils/helpers.py             (validadores e helper utcnow usados de fato)
                               config/{settings,constants}.py              ← novo
-                              controllers/{task,user,report,category}_controller.py  ← novo
+                              controllers/{task,user,report,category}_controller.py · validation.py  ← novo
                               middlewares/{error_handler,auth}.py         ← novo
                               .env.example · docs/
 ```
@@ -245,7 +246,7 @@ utils/helpers.py              utils/helpers.py             (validadores e helper
 | **Fase 2** — Relatório segue o template | ✅ | ✅ | ✅ |
 | Findings com arquivo e linhas exatos | ✅ | ✅ | ✅ |
 | Ordenados CRITICAL → LOW | ✅ | ✅ | ✅ |
-| Mínimo de 5 findings | ✅ 21 | ✅ 18 | ✅ 18 |
+| Mínimo de 5 findings | ✅ 21 | ✅ 18 | ✅ 20 |
 | APIs deprecated verificadas | ✅ nenhuma (correto para Flask 3.1) | ✅ callbacks do sqlite3 (padrão legado) | ✅ `Query.get()`, `datetime.utcnow()` |
 | Pausa e pede confirmação | ✅ | ✅ | ✅ |
 | **Fase 3** — Estrutura MVC | ✅ | ✅ | ✅ |
@@ -302,25 +303,36 @@ DELETE /api/users/1                              -> 401 sem token · 200 com tok
 [INFO] Processando pagamento de 497 no cartão final 4444    (antes: cartão completo + chave do gateway)
 ```
 
-**Projeto 3** — `python seed.py && python app.py`
+**Projeto 3** — `python seed.py && python app.py` (segunda execução, após o feedback do avaliador)
 ```
 python -W error::DeprecationWarning seed.py   →  3 usuários · 4 categorias · 10 tasks   (nenhum warning)
  * Debug mode: off
+--- rotas públicas (não citadas em findings CRITICAL)
 GET    / · /health                    -> 200 · 200
-GET    /tasks · /tasks/1 · /tasks/stats -> 200 · 200 · 200
+GET    /tasks · /tasks/1 · /tasks/stats · /users/2/tasks -> 200
 GET    /tasks/999                     -> 404
 GET    /tasks/search?q=a&status=pending -> 200
 GET    /tasks/search?priority=x       -> 400  (antes: 500)
 POST   /tasks                         -> 201
 POST   /tasks  (priority "alta")      -> 400  (antes: 500)
 PUT    /tasks/1                       -> 200
-GET    /users · /users/2 · /users/2/tasks -> 200 · 200 · 200   (sem password)
-POST   /users · PUT /users/2          -> 201 · 200
-POST   /login                         -> 200  {"token":"eyJ1aWQiOjJ9.ar1soA...", ...}   (token assinado)
-GET    /reports/summary · /reports/user/1 -> 200 · 200
-GET    /categories · POST · PUT       -> 200 · 201 · 200
-DELETE /tasks/2 · /categories/4       -> 200 · 200
-DELETE /users/3                       -> 401 sem token · 200 com token de admin
+POST   /login                         -> 200  {"token":"eyJ1aWQiOjJ9.asQVIQ...", ...}   (exceção: emite a credencial)
+--- 12 rotas citadas em findings CRITICAL: sem token / com token de admin
+GET    /users                         -> 401 / 200
+GET    /users/1                       -> 401 / 200   (sem password)
+POST   /users                         -> 401 / 201
+PUT    /users/2                       -> 401 / 200
+GET    /reports/summary               -> 401 / 200
+GET    /reports/user/1                -> 401 / 200
+GET    /categories                    -> 401 / 200
+POST   /categories                    -> 401 / 201
+PUT    /categories/1                  -> 401 / 200
+DELETE /tasks/2                       -> 401 / 200   ← apontada na revisão
+DELETE /categories/4                  -> 401 / 200   ← apontada na revisão
+DELETE /users/3                       -> 401 / 200
+--- autorização
+GET    /users  (token de usuário comum)   -> 403
+DELETE /tasks/1  (token "fake-jwt-token-1") -> 401
 grep: datetime.utcnow = 0 · .query.get( = 0 · hashlib.md5 = 0 · except: = 0 · debug=True = 0
 ```
 
@@ -330,7 +342,7 @@ O resumo completo de cada refatoração, com a lista de mudanças de contrato, e
 
 - **Python monolítico (P1):** criou `src/` com todas as camadas e manteve `app.py` na raiz como lançador, para preservar `python app.py`. Aplicou SQL parametrizado, `werkzeug.security` para as senhas e conexão por requisição em `flask.g`.
 - **Node/Express (P2):** a mudança principal foi o fluxo assíncrono. Criou um wrapper Promise sobre o `sqlite3`, com `transaction()`, e reescreveu o checkout e o relatório com `async/await`, trocando o N+1 por um único `LEFT JOIN`. Para as senhas usou `crypto.scrypt` nativo, sem adicionar dependência. Classificou o uso da API de callbacks como padrão legado, e não como API removida.
-- **Python parcialmente organizado (P3):** não moveu nada para `src/`. Manteve `models/`, `routes/` e `services/`, adicionou `config/`, `controllers/` e `middlewares/` e reaproveitou código morto (`helpers.py`, `Task.is_overdue`) em vez de duplicar. Foi o único projeto com APIs deprecated reais, e ele as substituiu.
+- **Python parcialmente organizado (P3):** não moveu nada para `src/`. Manteve `models/`, `routes/` e `services/`, adicionou `config/`, `controllers/` e `middlewares/` e reaproveitou código morto (`helpers.py`, `Task.is_overdue`) em vez de duplicar. Foi o único projeto com APIs deprecated reais, e ele as substituiu. Como já existia login, usou token assinado (`Authorization: Bearer`) para proteger as 12 rotas citadas nos findings CRITICAL, com papel de admin nas operações de gestão de usuários.
 - **O que se repetiu nas 3 stacks:** o mesmo template de relatório, a mesma cadeia F→AP→PB, o mesmo baseline e a mesma comparação antes/depois, e a documentação das mudanças de contrato. Isso mostra que o comportamento vem da skill, e não do projeto.
 
 ---
@@ -401,10 +413,13 @@ cd task-manager-api
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 rm -f instance/tasks.db && .venv/bin/python seed.py
 .venv/bin/python app.py &
-curl -s localhost:5000/tasks | head -c 200
-curl -s localhost:5000/reports/summary | head -c 200
-curl -s -X POST localhost:5000/login -H 'Content-Type: application/json' \
-     -d '{"email":"joao@email.com","password":"1234"}'
+curl -s localhost:5000/tasks | head -c 200                       # rota pública
+curl -s -o /dev/null -w "%{http_code}\n" -X DELETE localhost:5000/tasks/2   # 401: exige token
+TOKEN=$(curl -s -X POST localhost:5000/login -H 'Content-Type: application/json' \
+     -d '{"email":"joao@email.com","password":"1234"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+curl -s localhost:5000/reports/summary -H "Authorization: Bearer $TOKEN" | head -c 200
+curl -s -X DELETE localhost:5000/tasks/2 -H "Authorization: Bearer $TOKEN"  # 200 com token
 ```
+O `task-manager-api/api.http` já faz o login e envia o token nas rotas marcadas com `[auth]`.
 
 Variáveis de ambiente suportadas por projeto: veja o `.env.example` de cada um (`SECRET_KEY`, `ADMIN_TOKEN`, `PORT`, `CORS_ORIGINS`, …). Sem `SECRET_KEY`, um valor aleatório é gerado a cada boot, só para desenvolvimento.
