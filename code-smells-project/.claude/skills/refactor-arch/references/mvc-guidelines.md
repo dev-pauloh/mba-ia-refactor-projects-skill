@@ -130,10 +130,17 @@ O objetivo é que **os clientes existentes continuem funcionando**:
 
 **Mudanças de contrato permitidas (e obrigatórias quando o finding existir)** — sempre listadas em "Intentional contract changes":
 1. Remover campos sensíveis das respostas (`senha`, `password`, hash, `secret_key`, config interna).
-2. Proteger endpoints **administrativos/destrutivos globais** (paths com `admin`, `reset`, `query`, relatórios financeiros) com autenticação (ex.: header `X-Admin-Token` comparado com `ADMIN_TOKEN` do ambiente via comparação em tempo constante). Sem token → `401`/`403`; com token → comportamento original.
+2. **Toda rota citada em qualquer finding CRITICAL recebe autenticação — sem exceção de categoria.** Vale para qualquer anti-pattern (AP-01 a AP-06) e para qualquer tipo de rota: administrativa, destrutiva, CRUD comum ou de leitura (`DELETE /tasks/<id>`, `DELETE /categories/<id>`, `GET /usuarios`, `GET /health` etc.). "Citada" = a rota aparece no finding como `MÉTODO /path` (ver SKILL.md, Fase 2). A autenticação **soma-se** à correção específica do finding (ex.: parametrizar a query continua obrigatório).
+   - **Única exceção — a rota que emite a credencial** (login / obtenção de token): ela não pode exigir a credencial que ela própria emite, senão ninguém consegue se autenticar. Essa rota recebe a correção do seu finding e aparece explicitamente como exceção em "Intentional contract changes". Nenhuma outra rota pode usar essa exceção.
+   - **Mecanismo:** reutilize o que o projeto já tem ou passou a ter na refatoração. Se existe login, use token assinado (`Authorization: Bearer <token>`, PB-13). Se não existe, use token de API configurado no ambiente (header `X-API-Token` comparado com `API_TOKEN`) e, para rotas administrativas, `X-Admin-Token` comparado com `ADMIN_TOKEN` — sempre em tempo constante.
+   - **Autorização:** exija papel de admin quando o finding fala em privilégio, gestão de usuários, dados de outros usuários ou operações administrativas; nos demais casos basta estar autenticado.
+   - Sem credencial → `401`; credencial sem permissão → `403`; credencial válida → comportamento original.
+   - Também recebem autenticação de admin os paths administrativos/destrutivos globais (`admin`, `reset`, `query`, relatórios financeiros), mesmo que nenhum finding CRITICAL os cite.
 3. Endpoints que executam **código ou SQL arbitrário** enviados pelo cliente: além de exigir admin, ficam **desabilitados por padrão** por flag de config (ex.: `ENABLE_ADMIN_SQL=false` → `403`).
 4. Entradas inválidas que antes geravam `500` passam a gerar `400`.
-5. Não adicione autenticação a endpoints CRUD comuns que o baseline chama sem credenciais — registre como recomendação residual no resumo, para não quebrar clientes.
+5. Endpoints **que não são citados em nenhum finding CRITICAL** (nem são administrativos/destrutivos globais) continuam sem autenticação, para não quebrar clientes; registre-os como recomendação residual no resumo. Esta regra **nunca** se sobrepõe à regra 2.
+
+> **Rastreabilidade:** a seção "Findings addressed" do resumo final lista, para cada finding CRITICAL, **cada rota citada** e o mecanismo de autenticação aplicado (ou "exceção: emite credencial"). Rota citada e não protegida = finding não resolvido = validação reprovada.
 
 ## 7. Checklist de conformidade (use na validação)
 

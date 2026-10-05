@@ -44,6 +44,7 @@ Prossiga direto para a Fase 2.
 4. Para cada ocorrência confirmada, registre um finding: severidade (do catálogo, ajustável com justificativa), ID do anti-pattern, `arquivo:linhas`, descrição concreta do que o código faz, impacto e recomendação (com o ID do padrão do playbook).
    - Agrupe ocorrências do **mesmo** anti-pattern no mesmo arquivo em um finding com várias linhas; ocorrências em arquivos diferentes podem ser um finding com lista de locais.
    - Não reporte algo que você não consegue apontar no código.
+   - **Todo finding CRITICAL** lista na Description **cada rota HTTP afetada** como `MÉTODO /path` (ou "nenhuma rota" quando o problema não é exposto por rota, ex.: segredo só usado internamente). Essa lista é o contrato do que a Fase 3 precisa proteger com autenticação (mvc-guidelines §6, regra 2).
 5. Ordene CRITICAL → HIGH → MEDIUM → LOW e **imprima o relatório completo** exatamente no formato do template.
 6. Termine com a pergunta abaixo e **PARE. Aguarde a resposta do usuário. Não chame nenhuma ferramenta de escrita.**
 
@@ -66,10 +67,11 @@ Leia `references/mvc-guidelines.md` e `references/refactoring-playbook.md`, depo
    - Crie `.env.example` com todas as variáveis de configuração (sem valores secretos reais).
 5. **Validar** (obrigatório — não declare sucesso sem executar):
    - a) Boot: suba a aplicação com o **comando de start original**; verifique que não há erros/tracebacks no log.
-   - b) Endpoints: repita as mesmas requisições do baseline e compare status e chaves. Diferenças só são aceitas se forem mudanças de segurança intencionais (regra 4).
-   - c) Anti-patterns: repita os greps de detecção dos findings CRITICAL/HIGH e confirme que não restam ocorrências.
-   - d) Se algo falhar, corrija e valide de novo (até 3 ciclos); se ainda falhar, reporte com honestidade o que ficou pendente.
-   - e) Derrube o servidor ao final.
+   - b) Endpoints: repita as mesmas requisições do baseline e compare status e chaves. Diferenças só são aceitas se forem mudanças de segurança intencionais (regra 4). Rotas que passaram a exigir credencial são chamadas **duas vezes**: sem credencial (espera `401`/`403`) e com credencial válida (espera o status do baseline).
+   - c) Rotas citadas em findings CRITICAL: para **cada rota** listada em **qualquer** finding CRITICAL (ver mvc-guidelines §6, regra 2), confirme que sem credencial a resposta é `401`/`403` e com credencial válida é o status do baseline. A única exceção aceita é a rota que emite a credencial (login). Uma única rota citada que continue aberta reprova a validação — corrija antes de seguir.
+   - d) Anti-patterns: repita os greps de detecção dos findings CRITICAL/HIGH e confirme que não restam ocorrências.
+   - e) Se algo falhar, corrija e valide de novo (até 3 ciclos); se ainda falhar, reporte com honestidade o que ficou pendente.
+   - f) Derrube o servidor ao final.
 6. **Relatório final.** Imprima o bloco abaixo e salve-o também em `docs/refactor-summary.md`:
 
 ```
@@ -88,6 +90,7 @@ PHASE 3: REFACTORING COMPLETE
 ## Validation
   ✓/✗ Application boots without errors (`<comando>`)
   ✓/✗ All endpoints respond correctly (<N>/<N> match baseline)
+  ✓/✗ Every route cited in CRITICAL findings requires credentials (<N>/<N>, except the login route)
   ✓/✗ Zero CRITICAL/HIGH anti-patterns remaining
 <tabela baseline vs. depois: método | path | status antes | status depois>
 ================================

@@ -12,6 +12,7 @@ O relatório é o artefato que o humano revisa antes de autorizar a refatoraçã
    - `models.py:28, 47-50, 57-61` (várias linhas no mesmo arquivo)
    - Vários arquivos: uma linha `File:` por arquivo.
 4. **Description:** o que o código faz **concretamente** (cite o trecho/identificador), não uma definição genérica do anti-pattern.
+4.1. **Rotas afetadas (obrigatório em CRITICAL):** a Description de todo finding CRITICAL termina com `Routes: MÉTODO /path, MÉTODO /path` (ou `Routes: nenhuma`). A Fase 3 exige autenticação em cada rota listada, exceto a de login.
 5. **Impact:** consequência prática (o que um atacante/desenvolvedor/usuário sofre).
 6. **Recommendation:** ação específica + ID do playbook (`PB-xx`).
 7. **Summary:** as contagens devem bater com a quantidade de findings listados; `Total` = soma.
@@ -37,7 +38,7 @@ CRITICAL: <n> | HIGH: <n> | MEDIUM: <n> | LOW: <n>
 
 ### F01 [CRITICAL] <Título curto> (AP-xx)
 File: <arquivo>:<linhas>
-Description: <o que o código faz, com identificadores reais>
+Description: <o que o código faz, com identificadores reais>. Routes: <MÉTODO /path, ... | nenhuma>
 Impact: <consequência prática>
 Recommendation: <ação concreta> (PB-xx)
 
