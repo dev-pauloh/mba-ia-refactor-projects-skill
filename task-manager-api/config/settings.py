@@ -13,8 +13,9 @@ def _env_bool(name, default=False):
     return os.environ.get(name, str(default)).strip().lower() in ('1', 'true', 'yes')
 
 
-def _env_list(name, default=''):
-    return [item.strip() for item in os.environ.get(name, default).split(',') if item.strip()]
+def _env_list(name):
+    raw = os.environ.get(name, '')
+    return [item.strip() for item in raw.split(',') if item.strip()]
 
 
 def _secret(name):

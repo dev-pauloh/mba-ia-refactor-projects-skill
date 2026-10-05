@@ -23,21 +23,20 @@ def create_app(settings=Settings):
     app = Flask(__name__)
     app.config.from_object(settings)
 
-    if settings.CORS_ORIGINS:
-        CORS(app, origins=settings.CORS_ORIGINS)
+    if app.config['CORS_ORIGINS']:
+        CORS(app, origins=app.config['CORS_ORIGINS'])
+
     db.init_app(app)
 
-    token_service = TokenService(settings.SECRET_KEY, settings.TOKEN_MAX_AGE)
-    notification_service = NotificationService(
-        settings.SMTP_HOST, settings.SMTP_PORT, settings.SMTP_USER, settings.SMTP_PASSWORD,
-    )
+    token_service = TokenService(app.config['SECRET_KEY'], app.config['TOKEN_MAX_AGE'])
     app.extensions['token_service'] = token_service
+    notification_service = NotificationService.from_config(app.config)
 
+    app.register_blueprint(system_bp)
     app.register_blueprint(create_task_blueprint(TaskController(notification_service)))
     app.register_blueprint(create_user_blueprint(UserController(token_service)))
     app.register_blueprint(create_report_blueprint(ReportController()))
     app.register_blueprint(create_category_blueprint(CategoryController()))
-    app.register_blueprint(system_bp)
     register_error_handlers(app)
 
     with app.app_context():
@@ -48,4 +47,4 @@ def create_app(settings=Settings):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
-    create_app().run(host=Settings.HOST, port=Settings.PORT, debug=Settings.DEBUG)
+    create_app().run(debug=Settings.DEBUG, host=Settings.HOST, port=Settings.PORT)

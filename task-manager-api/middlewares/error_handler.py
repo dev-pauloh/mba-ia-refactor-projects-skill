@@ -3,17 +3,17 @@ import logging
 from flask import jsonify
 from werkzeug.exceptions import HTTPException
 
+from database import db
+
 logger = logging.getLogger(__name__)
 
 
 class AppError(Exception):
     status_code = 500
 
-    def __init__(self, message, status_code=None):
+    def __init__(self, message):
         super().__init__(message)
         self.message = message
-        if status_code is not None:
-            self.status_code = status_code
 
 
 class ValidationError(AppError):
@@ -39,6 +39,7 @@ class ConflictError(AppError):
 def register_error_handlers(app):
     @app.errorhandler(AppError)
     def handle_app_error(err):
+        db.session.rollback()
         return jsonify({'error': err.message}), err.status_code
 
     @app.errorhandler(HTTPException)
@@ -47,5 +48,6 @@ def register_error_handlers(app):
 
     @app.errorhandler(Exception)
     def handle_unexpected(err):
+        db.session.rollback()
         logger.exception('Erro não tratado')
         return jsonify({'error': 'Erro interno'}), 500

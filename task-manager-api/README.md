@@ -1,37 +1,27 @@
 # task-manager-api
 
-API de Task Manager em Python/Flask usada como entrada do desafio `refactor-arch`. Diferente dos outros projetos, este já possui alguma separação de camadas (`models/`, `routes/`, `services/`, `utils/`), mas ainda contém problemas arquiteturais e de qualidade.
+API de Task Manager em Python/Flask usada como entrada do desafio `refactor-arch`, organizada em MVC: `routes/` (View HTTP), `controllers/` (casos de uso), `models/` (dados), `services/` (token e notificações), `middlewares/` (auth e erros) e `config/` (settings via ambiente e constantes).
 
 ## Como rodar
 
 ```bash
 pip install -r requirements.txt
+cp .env.example .env   # ajuste SECRET_KEY e demais variáveis
 python seed.py
 python app.py
 ```
 
-A aplicação sobe em `http://localhost:5000`. O `seed.py` popula o banco SQLite (`tasks.db`) com usuários, categorias e tasks de exemplo — **rode-o antes do primeiro boot**, caso contrário os endpoints vão retornar listas vazias.
-
-## Configuração
-
-Toda a configuração vem de variáveis de ambiente (ou de um arquivo `.env`, carregado automaticamente). Copie `.env.example` para `.env` e defina ao menos `SECRET_KEY`; sem ela, uma chave aleatória é gerada a cada boot (os tokens emitidos deixam de valer ao reiniciar). Por padrão o servidor escuta em `127.0.0.1:5000`, com debug desligado e sem CORS para origens externas (`CORS_ORIGINS`).
+A aplicação sobe em `http://localhost:5000` (`HOST`/`PORT` configuráveis). O `seed.py` popula o banco SQLite (`tasks.db`) com usuários, categorias e tasks de exemplo — **rode-o antes do primeiro boot**, caso contrário os endpoints vão retornar listas vazias.
 
 ## Autenticação
 
-`POST /login` devolve um `token` assinado. Envie-o como `Authorization: Bearer <token>` para as operações administrativas:
+`POST /login` devolve um `token` assinado (expira em `TOKEN_MAX_AGE` segundos). Envie-o como `Authorization: Bearer <token>` nas rotas protegidas:
 
-- `DELETE /users/<id>` exige um usuário `admin`;
-- definir `role` diferente de `user` em `POST /users`, ou alterar `role`/`active` em `PUT /users/<id>`, exige um usuário `admin`.
+| Acesso | Rotas |
+|---|---|
+| Público | `GET /`, `GET /health`, `POST /login`, `GET/POST /tasks`, `GET/PUT /tasks/<id>`, `GET /tasks/search`, `GET /tasks/stats`, `GET /users/<id>/tasks` |
+| Autenticado | `DELETE /tasks/<id>`, `GET/POST /categories`, `PUT/DELETE /categories/<id>` |
+| Próprio usuário ou admin | `GET /users/<id>`, `PUT /users/<id>` (só admin altera `role`/`active`), `GET /reports/user/<id>` |
+| Admin | `GET /users`, `POST /users`, `DELETE /users/<id>`, `GET /reports/summary` |
 
-## Estrutura
-
-```
-app.py            composition root (create_app) + lançador
-config/           settings (env) e constantes de domínio
-models/           entidades SQLAlchemy e todo o acesso a dados
-controllers/      casos de uso: validação e regras de negócio
-routes/           blueprints HTTP finos (camada View)
-middlewares/      error handler central e autenticação
-services/         tokens assinados e notificações por e-mail
-utils/            helpers genéricos (datas, validadores)
-```
+Sem `SECRET_KEY` definida, uma chave aleatória é gerada a cada boot (tokens anteriores deixam de valer).

@@ -2,6 +2,19 @@
 # suba com PORT=5001 python app.py e troque a linha abaixo para 5001.
 @baseUrl = http://localhost:5000
 
+# Rotas marcadas com [auth] exigem token. Execute primeiro o "Login como admin" abaixo.
+
+### Login como admin (execute primeiro — o token é usado nas rotas [auth])
+# @name login
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "joao@email.com",
+  "password": "1234"
+}
+
+
 ### Índice da API
 GET {{baseUrl}}/
 
@@ -60,22 +73,26 @@ Content-Type: application/json
   "priority": 2
 }
 
-### Deletar task
+### Deletar task [auth]
 DELETE {{baseUrl}}/tasks/2
+Authorization: Bearer {{login.response.body.token}}
 
 # ---------------------------------------------------------------- Usuários
 
-### Listar usuários
+### Listar usuários [auth]
 GET {{baseUrl}}/users
+Authorization: Bearer {{login.response.body.token}}
 
-### Buscar usuário (sem o hash da senha)
+### Buscar usuário [auth] (sem o hash da senha)
 GET {{baseUrl}}/users/2
+Authorization: Bearer {{login.response.body.token}}
 
 ### Tasks de um usuário
 GET {{baseUrl}}/users/2/tasks
 
-### Criar usuário comum → 201
+### Criar usuário comum [auth] → 201
 POST {{baseUrl}}/users
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -84,7 +101,7 @@ Content-Type: application/json
   "password": "senhaforte"
 }
 
-### Criar usuário admin sem token → 403 (antes: escalava privilégio)
+### Criar usuário sem token → 401 (antes: qualquer um criava até admin)
 POST {{baseUrl}}/users
 Content-Type: application/json
 
@@ -95,44 +112,39 @@ Content-Type: application/json
   "role": "admin"
 }
 
-### Atualizar nome do usuário
+### Atualizar nome [auth] do usuário
 PUT {{baseUrl}}/users/2
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
   "name": "Maria S."
 }
 
-### Login como admin (o token é capturado para as próximas requisições)
-# @name login
-POST {{baseUrl}}/login
-Content-Type: application/json
-
-{
-  "email": "joao@email.com",
-  "password": "1234"
-}
-
 ### Deletar usuário sem token → 401
 DELETE {{baseUrl}}/users/3
 
-### Deletar usuário com token de admin → 200 (execute o login antes)
+### Deletar usuário com token de admin → 200 [auth]
 DELETE {{baseUrl}}/users/3
 Authorization: Bearer {{login.response.body.token}}
 
 # ---------------------------------------------------------------- Relatórios e categorias
 
-### Relatório geral
+### Relatório geral [auth]
 GET {{baseUrl}}/reports/summary
+Authorization: Bearer {{login.response.body.token}}
 
-### Relatório por usuário
+### Relatório por usuário [auth]
 GET {{baseUrl}}/reports/user/1
+Authorization: Bearer {{login.response.body.token}}
 
-### Listar categorias (com task_count)
+### Listar categorias [auth] (com task_count)
 GET {{baseUrl}}/categories
+Authorization: Bearer {{login.response.body.token}}
 
-### Criar categoria
+### Criar categoria [auth]
 POST {{baseUrl}}/categories
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -141,8 +153,9 @@ Content-Type: application/json
   "color": "#8e44ad"
 }
 
-### Criar categoria com cor inválida → 400
+### Criar categoria com cor inválida → 400 [auth]
 POST {{baseUrl}}/categories
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -150,13 +163,15 @@ Content-Type: application/json
   "color": "vermelho"
 }
 
-### Atualizar categoria
+### Atualizar categoria [auth]
 PUT {{baseUrl}}/categories/1
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
   "name": "Backend & APIs"
 }
 
-### Deletar categoria (tasks ficam sem categoria, não órfãs)
+### Deletar categoria [auth] (tasks ficam sem categoria, não órfãs)
 DELETE {{baseUrl}}/categories/4
+Authorization: Bearer {{login.response.body.token}}

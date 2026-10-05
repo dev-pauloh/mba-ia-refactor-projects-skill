@@ -1,41 +1,44 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 
-from middlewares.auth import current_user, require_admin
+from middlewares.auth import require_auth
 
 
 def create_user_blueprint(controller):
-    user_bp = Blueprint('users', __name__)
+    bp = Blueprint('users', __name__)
 
-    @user_bp.get('/users')
+    @bp.get('/users')
+    @require_auth(admin=True)
     def get_users():
         return jsonify(controller.list_users()), 200
 
-    @user_bp.get('/users/<int:user_id>')
+    @bp.get('/users/<int:user_id>')
+    @require_auth()
     def get_user(user_id):
-        return jsonify(controller.get_user(user_id)), 200
+        return jsonify(controller.get_user(user_id, g.current_user)), 200
 
-    @user_bp.post('/users')
+    @bp.post('/users')
+    @require_auth(admin=True)
     def create_user():
-        data = request.get_json(silent=True)
-        return jsonify(controller.create_user(data, acting_user=current_user())), 201
+        return jsonify(controller.create_user(request.get_json(silent=True))), 201
 
-    @user_bp.put('/users/<int:user_id>')
+    @bp.put('/users/<int:user_id>')
+    @require_auth()
     def update_user(user_id):
-        data = request.get_json(silent=True)
-        return jsonify(controller.update_user(user_id, data, acting_user=current_user())), 200
+        return jsonify(controller.update_user(user_id, request.get_json(silent=True), g.current_user)), 200
 
-    @user_bp.delete('/users/<int:user_id>')
-    @require_admin
+    @bp.delete('/users/<int:user_id>')
+    @require_auth(admin=True)
     def delete_user(user_id):
         controller.delete_user(user_id)
         return jsonify({'message': 'Usuário deletado com sucesso'}), 200
 
-    @user_bp.get('/users/<int:user_id>/tasks')
+    @bp.get('/users/<int:user_id>/tasks')
     def get_user_tasks(user_id):
         return jsonify(controller.list_user_tasks(user_id)), 200
 
-    @user_bp.post('/login')
+    @bp.post('/login')
     def login():
-        return jsonify(controller.login(request.get_json(silent=True))), 200
+        result = controller.login(request.get_json(silent=True))
+        return jsonify({'message': 'Login realizado com sucesso', **result}), 200
 
-    return user_bp
+    return bp

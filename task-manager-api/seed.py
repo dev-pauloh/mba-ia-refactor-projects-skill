@@ -3,18 +3,19 @@ from datetime import timedelta
 
 from app import create_app
 from database import db
+from models.category import Category
 from models.task import Task
 from models.user import User
-from models.category import Category
 from utils.helpers import utcnow
+
 
 def seed_data():
     app = create_app()
     with app.app_context():
 
-        Task.delete_all()
-        User.delete_all()
-        Category.delete_all()
+        Task.query.delete()
+        User.query.delete()
+        Category.query.delete()
         db.session.commit()
 
         u1 = User()
@@ -95,9 +96,11 @@ def seed_data():
 
         db.session.commit()
         print("Seed concluído com sucesso!")
-        print(f"  {User.count()} usuários")
-        print(f"  {Category.count()} categorias")
-        print(f"  {Task.count()} tasks")
+        print(f"  {User.query.count()} usuários")
+        print(f"  {Category.query.count()} categorias")
+        print(f"  {Task.query.count()} tasks")
+        db.session.remove()
+        db.engine.dispose()
 
 if __name__ == '__main__':
     seed_data()

@@ -1,96 +1,102 @@
 import logging
+from datetime import datetime
 
 from config.constants import (
-    DEFAULT_PRIORITY, DEFAULT_TASK_STATUS, DONE_STATUS, MAX_PRIORITY,
-    MAX_TITLE_LENGTH, MIN_PRIORITY, MIN_TITLE_LENGTH, TASK_STATUSES,
+    DATE_FORMAT, DEFAULT_PRIORITY, DEFAULT_STATUS, DONE_STATUS, PRIORITY_MAX, PRIORITY_MIN,
+    TASK_STATUSES, TITLE_MAX_LENGTH, TITLE_MIN_LENGTH,
 )
+from controllers.validation import parse_int, require_body
+from database import db
 from middlewares.error_handler import NotFoundError, ValidationError
 from models.category import Category
 from models.task import Task
 from models.user import User
-from utils.helpers import calculate_percentage, parse_date, parse_int, utcnow
+from utils.helpers import percentage, utcnow
 
 logger = logging.getLogger(__name__)
 
 
-def validate_title(title):
-    if not title:
-        raise ValidationError('Título é obrigatório')
+def _validate_title(title):
     if not isinstance(title, str):
         raise ValidationError('Título inválido')
-    if len(title) < MIN_TITLE_LENGTH:
+    if len(title) < TITLE_MIN_LENGTH:
         raise ValidationError('Título muito curto')
-    if len(title) > MAX_TITLE_LENGTH:
+    if len(title) > TITLE_MAX_LENGTH:
         raise ValidationError('Título muito longo')
     return title
 
 
-def validate_status(status):
-    if status not in TASK_STATUSES:
-        raise ValidationError('Status inválido')
-    return status
-
-
-def validate_priority(priority):
-    value = parse_int(priority)
-    if value is None:
+def _validate_priority(priority):
+    if isinstance(priority, bool) or not isinstance(priority, int):
         raise ValidationError('Prioridade inválida')
-    if not MIN_PRIORITY <= value <= MAX_PRIORITY:
-        raise ValidationError(f'Prioridade deve ser entre {MIN_PRIORITY} e {MAX_PRIORITY}')
-    return value
+    if priority < PRIORITY_MIN or priority > PRIORITY_MAX:
+        raise ValidationError(f'Prioridade deve ser entre {PRIORITY_MIN} e {PRIORITY_MAX}')
+    return priority
 
 
-def validate_due_date(due_date):
-    if not due_date:
+def _validate_reference(model, ref_id, message):
+    """Confere se o id referenciado existe; None/0/'' desassocia."""
+    if not ref_id:
         return None
-    parsed = parse_date(due_date)
-    if parsed is None:
+    ref_id = parse_int(ref_id, 'Identificador inválido')
+    if model.get(ref_id) is None:
+        raise NotFoundError(message)
+    return ref_id
+
+
+def _validate_due_date(value):
+    if not value:
+        return None
+    if not isinstance(value, str):
         raise ValidationError('Formato de data inválido. Use YYYY-MM-DD')
-    return parsed
+    try:
+        return datetime.strptime(value, DATE_FORMAT)
+    except ValueError:
+        raise ValidationError('Formato de data inválido. Use YYYY-MM-DD') from None
 
 
-def validate_tags(tags):
+def _validate_tags(tags):
     if isinstance(tags, list):
         if not all(isinstance(tag, str) for tag in tags):
             raise ValidationError('Tags inválidas')
         return ','.join(tags)
     if tags is None or isinstance(tags, str):
-        return tags
+        return tags or None
     raise ValidationError('Tags inválidas')
 
 
-def ensure_user_exists(user_id):
-    if not user_id:
-        return None
-    user_pk = parse_int(user_id)
-    if user_pk is None:
-        raise ValidationError('Usuário inválido')
-    user = User.get_by_id(user_pk)
-    if user is None:
-        raise NotFoundError('Usuário não encontrado')
-    return user
+def validate_task_payload(data, partial):
+    """Valida o corpo de criação (partial=False) ou atualização (partial=True).
 
+    Retorna apenas os campos presentes, já normalizados para o model.
+    """
+    require_body(data)
 
-def ensure_category_exists(category_id):
-    if not category_id:
-        return None
-    category_pk = parse_int(category_id)
-    if category_pk is None:
-        raise ValidationError('Categoria inválida')
-    category = Category.get_by_id(category_pk)
-    if category is None:
-        raise NotFoundError('Categoria não encontrada')
-    return category
+    if not partial:
+        if not data.get('title'):
+            raise ValidationError('Título é obrigatório')
+        data = {'description': '', 'status': DEFAULT_STATUS, 'priority': DEFAULT_PRIORITY, **data}
 
-
-def task_stats(tasks_by_status, total, overdue):
-    done = tasks_by_status.get(DONE_STATUS, 0)
-    return {
-        'total': total,
-        **{status: tasks_by_status.get(status, 0) for status in TASK_STATUSES},
-        'overdue': overdue,
-        'completion_rate': calculate_percentage(done, total),
-    }
+    fields = {}
+    if 'title' in data:
+        fields['title'] = _validate_title(data['title'])
+    if 'description' in data:
+        fields['description'] = data['description']
+    if 'status' in data:
+        if data['status'] not in TASK_STATUSES:
+            raise ValidationError('Status inválido')
+        fields['status'] = data['status']
+    if 'priority' in data:
+        fields['priority'] = _validate_priority(data['priority'])
+    if 'user_id' in data:
+        fields['user_id'] = _validate_reference(User, data['user_id'], 'Usuário não encontrado')
+    if 'category_id' in data:
+        fields['category_id'] = _validate_reference(Category, data['category_id'], 'Categoria não encontrada')
+    if 'due_date' in data:
+        fields['due_date'] = _validate_due_date(data['due_date'])
+    if 'tags' in data:
+        fields['tags'] = _validate_tags(data['tags'])
+    return fields
 
 
 class TaskController:
@@ -100,7 +106,7 @@ class TaskController:
     def list_tasks(self):
         now = utcnow()
         result = []
-        for task in Task.list_with_relations():
+        for task in Task.list_all(with_relations=True):
             data = task.to_dict()
             data['overdue'] = task.is_overdue(now)
             data['user_name'] = task.user.name if task.user else None
@@ -115,95 +121,57 @@ class TaskController:
         return data
 
     def create_task(self, data):
-        if not data:
-            raise ValidationError('Dados inválidos')
-
-        title = validate_title(data.get('title'))
-        status = validate_status(data.get('status', DEFAULT_TASK_STATUS))
-        priority = validate_priority(data.get('priority', DEFAULT_PRIORITY))
-        user = ensure_user_exists(data.get('user_id'))
-        category = ensure_category_exists(data.get('category_id'))
-        due_date = validate_due_date(data.get('due_date'))
-        tags = validate_tags(data.get('tags'))
-
-        task = Task(
-            title=title,
-            description=data.get('description', ''),
-            status=status,
-            priority=priority,
-            user_id=user.id if user else None,
-            category_id=category.id if category else None,
-            due_date=due_date,
-            tags=tags or None,
-        )
-        task.save()
-        logger.info('Task criada id=%s', task.id)
-        if user:
-            self.notification_service.notify_task_assigned(user, task)
+        fields = validate_task_payload(data, partial=False)
+        task = Task(**fields)
+        db.session.add(task)
+        db.session.commit()
+        logger.info('Task criada: id=%s', task.id)
+        self._notify_assignment(task)
         return task.to_dict()
 
     def update_task(self, task_id, data):
         task = self._get_or_404(task_id)
-        if not data:
-            raise ValidationError('Dados inválidos')
-
-        if 'title' in data:
-            task.title = validate_title(data['title'])
-        if 'description' in data:
-            task.description = data['description']
-        if 'status' in data:
-            task.status = validate_status(data['status'])
-        if 'priority' in data:
-            task.priority = validate_priority(data['priority'])
-
-        new_assignee = None
-        if 'user_id' in data:
-            user = ensure_user_exists(data['user_id'])
-            if user and user.id != task.user_id:
-                new_assignee = user
-            task.user_id = user.id if user else None
-        if 'category_id' in data:
-            category = ensure_category_exists(data['category_id'])
-            task.category_id = category.id if category else None
-        if 'due_date' in data:
-            task.due_date = validate_due_date(data['due_date'])
-        if 'tags' in data:
-            task.tags = validate_tags(data['tags'])
-
-        task.touch()
-        task.save()
-        logger.info('Task atualizada id=%s', task.id)
-        if new_assignee:
-            self.notification_service.notify_task_assigned(new_assignee, task)
+        fields = validate_task_payload(data, partial=True)
+        previous_user_id = task.user_id
+        for name, value in fields.items():
+            setattr(task, name, value)
+        task.updated_at = utcnow()
+        db.session.commit()
+        logger.info('Task atualizada: id=%s', task.id)
+        if task.user_id != previous_user_id:
+            self._notify_assignment(task)
         return task.to_dict()
 
     def delete_task(self, task_id):
         task = self._get_or_404(task_id)
-        task.delete()
-        logger.info('Task deletada id=%s', task_id)
+        db.session.delete(task)
+        db.session.commit()
+        logger.info('Task deletada: id=%s', task_id)
 
     def search_tasks(self, text, status, priority, user_id):
-        priority_value = self._optional_int(priority, 'Prioridade inválida')
-        user_value = self._optional_int(user_id, 'Usuário inválido')
-        tasks = Task.search(text=text, status=status, priority=priority_value, user_id=user_value)
+        priority = parse_int(priority, 'Prioridade inválida') if priority else None
+        user_id = parse_int(user_id, 'user_id inválido') if user_id else None
+        tasks = Task.search(text=text, status=status, priority=priority, user_id=user_id)
         return [task.to_dict() for task in tasks]
 
     def stats(self):
-        overdue = len(Task.list_overdue(utcnow()))
-        return task_stats(Task.count_by_status(), Task.count(), overdue)
+        total = Task.count()
+        by_status = Task.count_by('status')
+        done = by_status.get(DONE_STATUS, 0)
+        stats = {status: by_status.get(status, 0) for status in TASK_STATUSES}
+        stats.update({
+            'total': total,
+            'overdue': len(Task.list_open_with_due_date_before(utcnow())),
+            'completion_rate': percentage(done, total),
+        })
+        return stats
 
-    @staticmethod
-    def _optional_int(value, message):
-        if not value:
-            return None
-        parsed = parse_int(value)
-        if parsed is None:
-            raise ValidationError(message)
-        return parsed
-
-    @staticmethod
-    def _get_or_404(task_id):
-        task = Task.get_by_id(task_id)
+    def _get_or_404(self, task_id):
+        task = Task.get(task_id)
         if task is None:
             raise NotFoundError('Task não encontrada')
         return task
+
+    def _notify_assignment(self, task):
+        if task.user is not None:
+            self.notification_service.notify_task_assigned(task.user, task)

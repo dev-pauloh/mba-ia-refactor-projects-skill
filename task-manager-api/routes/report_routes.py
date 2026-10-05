@@ -1,15 +1,19 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, g, jsonify
+
+from middlewares.auth import require_auth
 
 
 def create_report_blueprint(controller):
-    report_bp = Blueprint('reports', __name__)
+    bp = Blueprint('reports', __name__)
 
-    @report_bp.get('/reports/summary')
+    @bp.get('/reports/summary')
+    @require_auth(admin=True)
     def summary_report():
         return jsonify(controller.summary()), 200
 
-    @report_bp.get('/reports/user/<int:user_id>')
+    @bp.get('/reports/user/<int:user_id>')
+    @require_auth()
     def user_report(user_id):
-        return jsonify(controller.user_report(user_id)), 200
+        return jsonify(controller.user_report(user_id, g.current_user)), 200
 
-    return report_bp
+    return bp
