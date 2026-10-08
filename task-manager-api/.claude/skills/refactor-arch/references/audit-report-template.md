@@ -12,9 +12,9 @@ O relatório é o artefato que o humano revisa antes de autorizar a refatoraçã
    - `models.py:28, 47-50, 57-61` (várias linhas no mesmo arquivo)
    - Vários arquivos: uma linha `File:` por arquivo.
 4. **Description:** o que o código faz **concretamente** (cite o trecho/identificador), não uma definição genérica do anti-pattern.
-4.1. **Rotas afetadas (obrigatório em CRITICAL):** a Description de todo finding CRITICAL termina com `Routes: MÉTODO /path, MÉTODO /path` (ou `Routes: nenhuma`). A Fase 3 exige autenticação em cada rota listada, exceto a de login.
+4.1. **Rotas afetadas (obrigatório em todo finding cujo impacto acontece via HTTP, de qualquer severidade):** a Description termina com `Routes: MÉTODO /path, MÉTODO /path` (ou `Routes: nenhuma`), listando **todas** as rotas que produzem o impacto descrito. A Fase 3 corrige cada rota listada; nos findings CRITICAL e nos de autenticação/exposição, isso inclui exigir autenticação (exceto na rota de login).
 5. **Impact:** consequência prática (o que um atacante/desenvolvedor/usuário sofre).
-6. **Recommendation:** ação específica + ID do playbook (`PB-xx`).
+6. **Recommendation:** ação específica + ID do playbook (`PB-xx`) que **cobre tudo o que o Impact descreve**, em todas as rotas do `Routes:`. Exemplo: Impact "qualquer um lista usuários, pedidos e faturamento" → Recommendation "exigir autenticação em GET /usuarios, GET /usuarios/<id>, GET /pedidos, GET /pedidos/usuario/<id> e GET /relatorios/vendas", e não só "proteger as rotas administrativas".
 7. **Summary:** as contagens devem bater com a quantidade de findings listados; `Total` = soma.
 8. **APIs deprecated:** sempre informe o resultado da verificação na seção própria (mesmo que "nenhuma encontrada").
 9. Linhas de código ≈ soma de `wc -l` dos source files da Fase 1 (arredonde para dezenas).

@@ -44,7 +44,8 @@ Prossiga direto para a Fase 2.
 4. Para cada ocorrência confirmada, registre um finding: severidade (do catálogo, ajustável com justificativa), ID do anti-pattern, `arquivo:linhas`, descrição concreta do que o código faz, impacto e recomendação (com o ID do padrão do playbook).
    - Agrupe ocorrências do **mesmo** anti-pattern no mesmo arquivo em um finding com várias linhas; ocorrências em arquivos diferentes podem ser um finding com lista de locais.
    - Não reporte algo que você não consegue apontar no código.
-   - **Todo finding CRITICAL** lista na Description **cada rota HTTP afetada** como `MÉTODO /path` (ou "nenhuma rota" quando o problema não é exposto por rota, ex.: segredo só usado internamente). Essa lista é o contrato do que a Fase 3 precisa proteger com autenticação (mvc-guidelines §6, regra 2).
+   - **Todo finding, de qualquer severidade, cujo impacto acontece via HTTP** lista na Description **cada rota que produz esse impacto** como `MÉTODO /path` (ou `Routes: nenhuma` quando o problema não é exposto por rota). Se o Impact diz "qualquer um lista usuários, pedidos e faturamento", `Routes:` traz **todas** as rotas que listam usuários, pedidos e faturamento — não só as administrativas. Essa lista é o contrato do que a Fase 3 precisa corrigir (mvc-guidelines §6, regra 2).
+   - **Cobertura do impacto:** a Recommendation precisa eliminar **cada consequência** descrita no Impact, em **cada rota** listada. Antes de imprimir o relatório, releia cada finding e confira item a item: para cada dado exposto ou ação possível no Impact, a Recommendation diz como ela deixa de acontecer. Se faltar algo, **amplie a Recommendation** (nunca reduza o Impact para caber nela).
 5. Ordene CRITICAL → HIGH → MEDIUM → LOW e **imprima o relatório completo** exatamente no formato do template.
 6. Termine com a pergunta abaixo e **PARE. Aguarde a resposta do usuário. Não chame nenhuma ferramenta de escrita.**
 
@@ -62,13 +63,13 @@ Leia `references/mvc-guidelines.md` e `references/refactoring-playbook.md`, depo
 1. **Registrar o relatório.** Salve o relatório da Fase 2, sem alterações, em `docs/audit-report.md` no projeto.
 2. **Baseline.** Prepare o ambiente (ex.: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`, `npm install`), rode o seed se necessário, suba a aplicação **em background** e chame cada rota do inventário com requisições válidas (use exemplos do README/`*.http` quando existirem). Registre método, path, status e chaves de topo do JSON numa tabela. Destrutivas por último. Derrube o processo ao final (`kill` pelo PID) e apague bancos locais gerados só pelo baseline (ex.: `*.db` ignorados pelo git) para que o seed rode de novo.
 3. **Planejar.** Defina a estrutura-alvo a partir de mvc-guidelines §3-4, adaptada à stack e ao nível de organização atual. Imprima o mapeamento `arquivo antigo → arquivo(s) novo(s)`.
-4. **Refatorar** aplicando os padrões do playbook para **cada finding** do relatório (use o ID PB-xx indicado). Ordem recomendada: config/segredos → camada de dados (models, SQL parametrizado, hash de senha) → controllers/services → views/rotas → error handling → composition root → limpeza (código morto, imports, arquivos antigos que foram totalmente migrados).
+4. **Refatorar** aplicando os padrões do playbook para **cada finding** do relatório (use o ID PB-xx indicado). Aplique a Recommendation **inteira**, em todas as rotas do `Routes:` do finding: nada que esteja descrito no Impact de um finding pode ficar para "recomendação residual". Ordem recomendada: config/segredos → camada de dados (models, SQL parametrizado, hash de senha) → controllers/services → views/rotas → error handling → composition root → limpeza (código morto, imports, arquivos antigos que foram totalmente migrados).
    - Se precisar de dependência nova, prefira stdlib ou algo já incluído no framework; se adicionar, atualize o manifesto.
    - Crie `.env.example` com todas as variáveis de configuração (sem valores secretos reais).
 5. **Validar** (obrigatório — não declare sucesso sem executar):
    - a) Boot: suba a aplicação com o **comando de start original**; verifique que não há erros/tracebacks no log.
    - b) Endpoints: repita as mesmas requisições do baseline e compare status e chaves. Diferenças só são aceitas se forem mudanças de segurança intencionais (regra 4). Rotas que passaram a exigir credencial são chamadas **duas vezes**: sem credencial (espera `401`/`403`) e com credencial válida (espera o status do baseline).
-   - c) Rotas citadas em findings CRITICAL: para **cada rota** listada em **qualquer** finding CRITICAL (ver mvc-guidelines §6, regra 2), confirme que sem credencial a resposta é `401`/`403` e com credencial válida é o status do baseline. A única exceção aceita é a rota que emite a credencial (login). Uma única rota citada que continue aberta reprova a validação — corrija antes de seguir.
+   - c) Impacto eliminado, finding a finding: para **cada finding** do relatório (qualquer severidade), reproduza o cenário descrito no Impact e confirme que ele **não acontece mais**. Para findings de autenticação/exposição, chame **cada rota** do `Routes:` sem credencial (espera `401`/`403`) e com credencial válida (espera o status do baseline). Também vale para toda rota citada em finding CRITICAL (mvc-guidelines §6, regra 2). A única exceção aceita é a rota que emite a credencial (login). Um único impacto que ainda se reproduza reprova a validação — corrija antes de seguir.
    - d) Anti-patterns: repita os greps de detecção dos findings CRITICAL/HIGH e confirme que não restam ocorrências.
    - e) Se algo falhar, corrija e valide de novo (até 3 ciclos); se ainda falhar, reporte com honestidade o que ficou pendente.
    - f) Derrube o servidor ao final.
@@ -90,7 +91,8 @@ PHASE 3: REFACTORING COMPLETE
 ## Validation
   ✓/✗ Application boots without errors (`<comando>`)
   ✓/✗ All endpoints respond correctly (<N>/<N> match baseline)
-  ✓/✗ Every route cited in CRITICAL findings requires credentials (<N>/<N>, except the login route)
+  ✓/✗ Every finding's impact no longer reproduces (<N>/<N> findings)
+  ✓/✗ Every route cited in auth/exposure findings or CRITICAL findings requires credentials (<N>/<N>, except the login route)
   ✓/✗ Zero CRITICAL/HIGH anti-patterns remaining
 <tabela baseline vs. depois: método | path | status antes | status depois>
 ================================
