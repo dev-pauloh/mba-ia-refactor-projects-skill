@@ -4,47 +4,39 @@ from flask import Flask
 from flask_cors import CORS
 
 from config.settings import Settings
-from controllers.category_controller import CategoryController
-from controllers.report_controller import ReportController
-from controllers.task_controller import TaskController
-from controllers.user_controller import UserController
-from database import db
+from database import init_db
 from middlewares.error_handler import register_error_handlers
-from routes.category_routes import create_category_blueprint
-from routes.report_routes import create_report_blueprint
+from routes.category_routes import category_bp
+from routes.report_routes import report_bp
 from routes.system_routes import system_bp
-from routes.task_routes import create_task_blueprint
-from routes.user_routes import create_user_blueprint
+from routes.task_routes import task_bp
+from routes.user_routes import user_bp
 from services.notification_service import NotificationService
 from services.token_service import TokenService
 
 
 def create_app(settings=Settings):
+    logging.basicConfig(level=settings.LOG_LEVEL, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+
     app = Flask(__name__)
     app.config.from_object(settings)
 
-    if app.config['CORS_ORIGINS']:
-        CORS(app, origins=app.config['CORS_ORIGINS'])
+    if settings.CORS_ORIGINS:
+        CORS(app, origins=settings.CORS_ORIGINS)
 
-    db.init_app(app)
+    init_db(app)
+    app.extensions['token_service'] = TokenService(settings.SECRET_KEY, settings.TOKEN_MAX_AGE)
+    app.extensions['notification_service'] = NotificationService(
+        settings.SMTP_HOST, settings.SMTP_PORT, settings.SMTP_USER, settings.SMTP_PASSWORD
+    )
 
-    token_service = TokenService(app.config['SECRET_KEY'], app.config['TOKEN_MAX_AGE'])
-    app.extensions['token_service'] = token_service
-    notification_service = NotificationService.from_config(app.config)
-
-    app.register_blueprint(system_bp)
-    app.register_blueprint(create_task_blueprint(TaskController(notification_service)))
-    app.register_blueprint(create_user_blueprint(UserController(token_service)))
-    app.register_blueprint(create_report_blueprint(ReportController()))
-    app.register_blueprint(create_category_blueprint(CategoryController()))
     register_error_handlers(app)
-
-    with app.app_context():
-        db.create_all()
-
+    for blueprint in (system_bp, task_bp, user_bp, report_bp, category_bp):
+        app.register_blueprint(blueprint)
     return app
 
 
+app = create_app()
+
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
-    create_app().run(debug=Settings.DEBUG, host=Settings.HOST, port=Settings.PORT)
+    app.run(host=Settings.HOST, port=Settings.PORT, debug=Settings.DEBUG)

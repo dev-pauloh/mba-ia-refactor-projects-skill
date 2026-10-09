@@ -4,36 +4,9 @@ from flask import jsonify
 from werkzeug.exceptions import HTTPException
 
 from database import db
+from utils.errors import AppError
 
 logger = logging.getLogger(__name__)
-
-
-class AppError(Exception):
-    status_code = 500
-
-    def __init__(self, message):
-        super().__init__(message)
-        self.message = message
-
-
-class ValidationError(AppError):
-    status_code = 400
-
-
-class UnauthorizedError(AppError):
-    status_code = 401
-
-
-class ForbiddenError(AppError):
-    status_code = 403
-
-
-class NotFoundError(AppError):
-    status_code = 404
-
-
-class ConflictError(AppError):
-    status_code = 409
 
 
 def register_error_handlers(app):
@@ -44,6 +17,7 @@ def register_error_handlers(app):
 
     @app.errorhandler(HTTPException)
     def handle_http_error(err):
+        db.session.rollback()
         return jsonify({'error': err.description}), err.code
 
     @app.errorhandler(Exception)

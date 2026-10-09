@@ -1,23 +1,27 @@
-TASK_STATUSES = ('pending', 'in_progress', 'done', 'cancelled')
-CLOSED_STATUSES = ('done', 'cancelled')
-DEFAULT_STATUS = 'pending'
-DONE_STATUS = 'done'
+"""Constantes de domínio do Task Manager."""
 
-PRIORITY_MIN = 1
-PRIORITY_MAX = 5
+STATUS_PENDING = 'pending'
+STATUS_IN_PROGRESS = 'in_progress'
+STATUS_DONE = 'done'
+STATUS_CANCELLED = 'cancelled'
+TASK_STATUSES = (STATUS_PENDING, STATUS_IN_PROGRESS, STATUS_DONE, STATUS_CANCELLED)
+CLOSED_STATUSES = (STATUS_DONE, STATUS_CANCELLED)
+
+ROLE_USER = 'user'
+ROLE_ADMIN = 'admin'
+ROLE_MANAGER = 'manager'
+USER_ROLES = (ROLE_USER, ROLE_ADMIN, ROLE_MANAGER)
+
+MIN_PRIORITY = 1
+MAX_PRIORITY = 5
 DEFAULT_PRIORITY = 3
-HIGH_PRIORITY_MAX = 2
+HIGH_PRIORITY_THRESHOLD = 2  # prioridades 1 e 2 contam como "alta prioridade"
 PRIORITY_LABELS = {1: 'critical', 2: 'high', 3: 'medium', 4: 'low', 5: 'minimal'}
 
-TITLE_MIN_LENGTH = 3
-TITLE_MAX_LENGTH = 200
-DATE_FORMAT = '%Y-%m-%d'
-
-USER_ROLES = ('user', 'admin', 'manager')
-DEFAULT_ROLE = 'user'
-ADMIN_ROLE = 'admin'
-MIN_PASSWORD_LENGTH = 4
-EMAIL_PATTERN = r'^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$'
+MIN_TITLE_LENGTH = 3
+MAX_TITLE_LENGTH = 200
+MIN_PASSWORD_LENGTH = 8
 
 DEFAULT_COLOR = '#000000'
 RECENT_ACTIVITY_DAYS = 7
+DATE_FORMAT = '%Y-%m-%d'

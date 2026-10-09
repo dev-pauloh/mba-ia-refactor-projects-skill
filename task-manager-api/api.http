@@ -2,7 +2,7 @@
 # suba com PORT=5001 python app.py e troque a linha abaixo para 5001.
 @baseUrl = http://localhost:5000
 
-# Rotas marcadas com [auth] exigem token. Execute primeiro o "Login como admin" abaixo.
+# Rotas marcadas com exigem token. Execute primeiro o "Login como admin" abaixo.
 
 ### Login como admin (execute primeiro — o token é usado nas rotas [auth])
 # @name login
@@ -11,7 +11,7 @@ Content-Type: application/json
 
 {
   "email": "joao@email.com",
-  "password": "1234"
+  "password": "joao1234"
 }
 
 
@@ -23,26 +23,33 @@ GET {{baseUrl}}/health
 
 # ---------------------------------------------------------------- Tasks
 
-### Listar tasks (com user_name/category_name, sem N+1)
+### Listar tasks (com user_name/category_name, sem N+1) [auth]
 GET {{baseUrl}}/tasks
+Authorization: Bearer {{login.response.body.token}}
 
-### Buscar task por id
+### Buscar task por id [auth]
 GET {{baseUrl}}/tasks/1
+Authorization: Bearer {{login.response.body.token}}
 
-### Task inexistente → 404
+### Task inexistente → 404 [auth]
 GET {{baseUrl}}/tasks/999
+Authorization: Bearer {{login.response.body.token}}
 
-### Pesquisar tasks
+### Pesquisar tasks [auth]
 GET {{baseUrl}}/tasks/search?q=a&status=pending
+Authorization: Bearer {{login.response.body.token}}
 
-### Pesquisa com prioridade inválida → 400 (antes: 500)
+### Pesquisa com prioridade inválida → 400 (antes: 500) [auth]
 GET {{baseUrl}}/tasks/search?priority=alta
+Authorization: Bearer {{login.response.body.token}}
 
-### Estatísticas
+### Estatísticas [auth]
 GET {{baseUrl}}/tasks/stats
+Authorization: Bearer {{login.response.body.token}}
 
-### Criar task → 201
+### Criar task → 201 [auth]
 POST {{baseUrl}}/tasks
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -55,8 +62,9 @@ Content-Type: application/json
   "tags": ["mba", "ia"]
 }
 
-### Criar task com prioridade inválida → 400 (antes: 500)
+### Criar task com prioridade inválida → 400 (antes: 500) [auth]
 POST {{baseUrl}}/tasks
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -64,8 +72,9 @@ Content-Type: application/json
   "priority": "alta"
 }
 
-### Atualizar task
+### Atualizar task [auth]
 PUT {{baseUrl}}/tasks/1
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -83,14 +92,15 @@ Authorization: Bearer {{login.response.body.token}}
 GET {{baseUrl}}/users
 Authorization: Bearer {{login.response.body.token}}
 
-### Buscar usuário [auth] (sem o hash da senha)
+### Buscar usuário (sem o hash da senha) [auth]
 GET {{baseUrl}}/users/2
 Authorization: Bearer {{login.response.body.token}}
 
-### Tasks de um usuário
+### Tasks de um usuário [auth]
 GET {{baseUrl}}/users/2/tasks
+Authorization: Bearer {{login.response.body.token}}
 
-### Criar usuário comum [auth] → 201
+### Criar usuário comum → 201 [auth]
 POST {{baseUrl}}/users
 Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
@@ -112,7 +122,7 @@ Content-Type: application/json
   "role": "admin"
 }
 
-### Atualizar nome [auth] do usuário
+### Atualizar nome do usuário [auth]
 PUT {{baseUrl}}/users/2
 Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
@@ -138,7 +148,7 @@ Authorization: Bearer {{login.response.body.token}}
 GET {{baseUrl}}/reports/user/1
 Authorization: Bearer {{login.response.body.token}}
 
-### Listar categorias [auth] (com task_count)
+### Listar categorias (com task_count) [auth]
 GET {{baseUrl}}/categories
 Authorization: Bearer {{login.response.body.token}}
 
@@ -172,6 +182,6 @@ Content-Type: application/json
   "name": "Backend & APIs"
 }
 
-### Deletar categoria [auth] (tasks ficam sem categoria, não órfãs)
+### Deletar categoria (tasks ficam sem categoria, não órfãs) [auth]
 DELETE {{baseUrl}}/categories/4
 Authorization: Bearer {{login.response.body.token}}

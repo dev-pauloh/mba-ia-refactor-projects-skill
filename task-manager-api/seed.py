@@ -1,41 +1,40 @@
 """Script para popular o banco com dados iniciais"""
 from datetime import timedelta
 
-from app import create_app
+from sqlalchemy import delete, func, select
+
+from app import app
 from database import db
 from models.category import Category
 from models.task import Task
 from models.user import User
 from utils.helpers import utcnow
 
-
 def seed_data():
-    app = create_app()
     with app.app_context():
 
-        Task.query.delete()
-        User.query.delete()
-        Category.query.delete()
+        for model in (Task, User, Category):
+            db.session.execute(delete(model))
         db.session.commit()
 
         u1 = User()
         u1.name = 'João Silva'
         u1.email = 'joao@email.com'
-        u1.set_password('1234')
+        u1.set_password('joao1234')
         u1.role = 'admin'
         db.session.add(u1)
 
         u2 = User()
         u2.name = 'Maria Santos'
         u2.email = 'maria@email.com'
-        u2.set_password('abcd')
+        u2.set_password('maria1234')
         u2.role = 'user'
         db.session.add(u2)
 
         u3 = User()
         u3.name = 'Pedro Oliveira'
         u3.email = 'pedro@email.com'
-        u3.set_password('pass')
+        u3.set_password('pedro1234')
         u3.role = 'manager'
         db.session.add(u3)
 
@@ -96,11 +95,8 @@ def seed_data():
 
         db.session.commit()
         print("Seed concluído com sucesso!")
-        print(f"  {User.query.count()} usuários")
-        print(f"  {Category.query.count()} categorias")
-        print(f"  {Task.query.count()} tasks")
-        db.session.remove()
-        db.engine.dispose()
+        for label, model in (('usuários', User), ('categorias', Category), ('tasks', Task)):
+            print(f"  {db.session.scalar(select(func.count(model.id)))} {label}")
 
 if __name__ == '__main__':
     seed_data()

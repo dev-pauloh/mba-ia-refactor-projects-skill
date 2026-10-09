@@ -20,15 +20,3 @@ class Category(db.Model):
             'color': self.color,
             'created_at': str(self.created_at),
         }
-
-    @classmethod
-    def get(cls, category_id):
-        return db.session.get(cls, category_id)
-
-    @classmethod
-    def list_all(cls):
-        return db.session.execute(db.select(cls).order_by(cls.id)).scalars().all()
-
-    @classmethod
-    def count(cls):
-        return db.session.execute(db.select(db.func.count(cls.id))).scalar_one()

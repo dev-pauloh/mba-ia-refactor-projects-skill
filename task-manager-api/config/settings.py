@@ -1,3 +1,4 @@
+"""Configuração da aplicação lida de variáveis de ambiente (.env opcional)."""
 import logging
 import os
 import secrets
@@ -14,8 +15,7 @@ def _env_bool(name, default=False):
 
 
 def _env_list(name):
-    raw = os.environ.get(name, '')
-    return [item.strip() for item in raw.split(',') if item.strip()]
+    return [item.strip() for item in os.environ.get(name, '').split(',') if item.strip()]
 
 
 def _secret(name):
@@ -35,8 +35,9 @@ class Settings:
     HOST = os.environ.get('HOST', '127.0.0.1')
     PORT = int(os.environ.get('PORT', '5000'))
     CORS_ORIGINS = _env_list('CORS_ORIGINS')
+    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
 
-    TOKEN_MAX_AGE = int(os.environ.get('TOKEN_MAX_AGE', '3600'))
+    TOKEN_MAX_AGE = int(os.environ.get('TOKEN_MAX_AGE', '28800'))
 
     SMTP_HOST = os.environ.get('SMTP_HOST', '')
     SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
