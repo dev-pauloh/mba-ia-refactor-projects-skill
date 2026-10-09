@@ -1,51 +1,40 @@
 import logging
 
-from src.errors import NotFoundError, UnauthorizedError, ValidationError
+from src.config.constants import TIPO_ADMIN
+from src.errors import ConflictError, ForbiddenError, NotFoundError, UnauthorizedError
 from src.models import usuario_model
+from src.services import token_service, usuario_service
 
 logger = logging.getLogger(__name__)
-
-
-def _campo_texto(dados, campo):
-    valor = dados.get(campo, "")
-    return valor if isinstance(valor, str) else ""
 
 
 def listar():
     return usuario_model.listar()
 
 
-def buscar(usuario_id):
+def buscar(usuario_id, solicitante):
+    if solicitante["tipo"] != TIPO_ADMIN and solicitante["id"] != usuario_id:
+        raise ForbiddenError("Acesso negado aos dados de outro usuário")
     usuario = usuario_model.buscar_por_id(usuario_id)
-    if not usuario:
+    if usuario is None:
         raise NotFoundError("Usuário não encontrado")
     return usuario
 
 
 def criar(dados):
-    if not isinstance(dados, dict) or not dados:
-        raise ValidationError("Dados inválidos")
-    nome = _campo_texto(dados, "nome")
-    email = _campo_texto(dados, "email")
-    senha = _campo_texto(dados, "senha")
-    if not nome or not email or not senha:
-        raise ValidationError("Nome, email e senha são obrigatórios")
-
-    usuario_id = usuario_model.criar(nome, email, senha)
-    logger.info("Usuário criado id=%s", usuario_id)
-    return {"id": usuario_id}
+    usuario = usuario_service.validar_cadastro(dados)
+    if usuario_model.email_existe(usuario["email"]):
+        raise ConflictError("Email já cadastrado")
+    novo_id = usuario_model.criar(**usuario)
+    logger.info("Usuário criado id=%s", novo_id)
+    return {"id": novo_id}
 
 
 def login(dados):
-    dados = dados if isinstance(dados, dict) else {}
-    email = _campo_texto(dados, "email")
-    senha = _campo_texto(dados, "senha")
-    if not email or not senha:
-        raise ValidationError("Email e senha são obrigatórios")
-
+    email, senha = usuario_service.validar_credenciais(dados)
     usuario = usuario_model.autenticar(email, senha)
-    if not usuario:
+    if usuario is None:
         logger.info("Login falhou")
-        raise UnauthorizedError("Email ou senha inválidos", com_sucesso=True)
+        raise UnauthorizedError("Email ou senha inválidos")
     logger.info("Login bem-sucedido usuario_id=%s", usuario["id"])
-    return usuario
+    return usuario, token_service.emitir(usuario["id"])

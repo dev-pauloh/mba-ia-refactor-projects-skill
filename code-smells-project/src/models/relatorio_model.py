@@ -1,14 +1,18 @@
+from src.config.constants import STATUS_APROVADO, STATUS_CANCELADO, STATUS_PENDENTE
 from src.database.connection import get_db
 
 
-def resumo_pedidos():
-    """Total de pedidos, faturamento e contagem por status em uma única query."""
-    rows = get_db().execute(
-        "SELECT status, COUNT(*) AS quantidade, COALESCE(SUM(total), 0) AS faturamento FROM pedidos GROUP BY status"
-    ).fetchall()
-    por_status = {row["status"]: row["quantidade"] for row in rows}
-    return {
-        "total_pedidos": sum(por_status.values()),
-        "faturamento": sum(row["faturamento"] for row in rows),
-        "por_status": por_status,
-    }
+def agregados_vendas():
+    """Contagens e soma de pedidos numa única query."""
+    row = get_db().execute(
+        """
+        SELECT COUNT(*) AS total_pedidos,
+               COALESCE(SUM(total), 0) AS faturamento,
+               COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS pendentes,
+               COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS aprovados,
+               COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS cancelados
+        FROM pedidos
+        """,
+        (STATUS_PENDENTE, STATUS_APROVADO, STATUS_CANCELADO),
+    ).fetchone()
+    return dict(row)

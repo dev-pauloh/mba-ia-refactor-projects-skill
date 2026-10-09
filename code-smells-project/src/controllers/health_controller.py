@@ -1,11 +1,11 @@
-from src.config.constants import API_VERSAO
-from src.models import pedido_model, produto_model, usuario_model
+from src.config.constants import API_VERSION
+from src.models import health_model
 
 
-def indice():
+def index():
     return {
         "mensagem": "Bem-vindo à API da Loja",
-        "versao": API_VERSAO,
+        "versao": API_VERSION,
         "endpoints": {
             "produtos": "/produtos",
             "usuarios": "/usuarios",
@@ -17,15 +17,10 @@ def indice():
     }
 
 
-def status(ambiente):
+def health():
     return {
         "status": "ok",
         "database": "connected",
-        "counts": {
-            "produtos": produto_model.contar(),
-            "usuarios": usuario_model.contar(),
-            "pedidos": pedido_model.contar(),
-        },
-        "versao": API_VERSAO,
-        "ambiente": ambiente,
+        "counts": health_model.contagens(),
+        "versao": API_VERSION,
     }

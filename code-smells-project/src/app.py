@@ -1,10 +1,8 @@
-import logging
-
 from flask import Flask
 from flask_cors import CORS
 
 from src.config.settings import Settings
-from src.database import connection
+from src.database.connection import init_db
 from src.middlewares.error_handler import register_error_handlers
 from src.views import admin_routes, health_routes, pedido_routes, produto_routes, relatorio_routes, usuario_routes
 
@@ -18,21 +16,15 @@ BLUEPRINTS = (
 )
 
 
-def create_app(settings=None):
-    settings = settings or Settings()
-    logging.basicConfig(
-        level=settings.LOG_LEVEL,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-
+def create_app(settings=Settings):
     app = Flask(__name__)
     app.config.from_object(settings)
 
-    if settings.CORS_ORIGINS:
-        CORS(app, origins=settings.CORS_ORIGINS)
+    if app.config["CORS_ORIGINS"]:
+        CORS(app, origins=app.config["CORS_ORIGINS"])
 
-    connection.init_app(app)
+    init_db(app)
+    register_error_handlers(app)
     for blueprint in BLUEPRINTS:
         app.register_blueprint(blueprint)
-    register_error_handlers(app)
     return app

@@ -1,13 +1,11 @@
 class AppError(Exception):
-    """Erro de domínio; o error handler central traduz para resposta HTTP."""
-
     status_code = 500
 
-    def __init__(self, message, *, com_sucesso=False):
+    def __init__(self, message, status_code=None):
         super().__init__(message)
         self.message = message
-        # Algumas respostas de erro da API original incluem "sucesso": false; mantém o contrato.
-        self.com_sucesso = com_sucesso
+        if status_code is not None:
+            self.status_code = status_code
 
 
 class ValidationError(AppError):
@@ -24,3 +22,7 @@ class ForbiddenError(AppError):
 
 class NotFoundError(AppError):
     status_code = 404
+
+
+class ConflictError(AppError):
+    status_code = 409

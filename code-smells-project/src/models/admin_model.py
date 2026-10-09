@@ -1,20 +1,29 @@
-from src.database.connection import get_db
+import logging
+import sqlite3
 
-TABELAS_RESET = ("itens_pedido", "pedidos", "produtos", "usuarios")
+from src.database.connection import get_db, get_readonly_db
+from src.errors import ValidationError
+
+logger = logging.getLogger(__name__)
 
 
 def resetar_banco():
+    """Apaga todos os dados numa única transação (filhos antes dos pais)."""
     db = get_db()
     with db:
-        for tabela in TABELAS_RESET:
-            db.execute(f"DELETE FROM {tabela}")
+        db.execute("DELETE FROM itens_pedido")
+        db.execute("DELETE FROM pedidos")
+        db.execute("DELETE FROM produtos")
+        db.execute("DELETE FROM usuarios")
 
 
-def executar_sql(sql):
-    """Executa SQL administrativo; retorna linhas para SELECT, None para escrita."""
-    db = get_db()
-    with db:
-        cursor = db.execute(sql)
-        if sql.strip().upper().startswith("SELECT"):
-            return [dict(row) for row in cursor.fetchall()]
-    return None
+def consultar_somente_leitura(sql):
+    """Executa uma única instrução numa conexão aberta em modo somente leitura."""
+    conn = get_readonly_db()
+    try:
+        return [dict(row) for row in conn.execute(sql).fetchall()]
+    except sqlite3.Error:
+        logger.exception("Consulta administrativa falhou")
+        raise ValidationError("Query inválida ou não permitida") from None
+    finally:
+        conn.close()

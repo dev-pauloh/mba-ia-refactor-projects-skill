@@ -11,16 +11,13 @@ logger = logging.getLogger(__name__)
 def register_error_handlers(app):
     @app.errorhandler(AppError)
     def handle_app_error(err):
-        corpo = {"erro": err.message}
-        if err.com_sucesso:
-            corpo["sucesso"] = False
-        return jsonify(corpo), err.status_code
+        return jsonify({"erro": err.message, "sucesso": False}), err.status_code
 
     @app.errorhandler(HTTPException)
     def handle_http_error(err):
-        return jsonify({"erro": err.description}), err.code
+        return jsonify({"erro": err.description, "sucesso": False}), err.code
 
     @app.errorhandler(Exception)
     def handle_unexpected(err):
         logger.exception("Erro não tratado")
-        return jsonify({"erro": "Erro interno do servidor"}), 500
+        return jsonify({"erro": "Erro interno do servidor", "sucesso": False}), 500

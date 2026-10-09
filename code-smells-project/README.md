@@ -1,38 +1,51 @@
 # code-smells-project
 
-API de E-commerce em Python/Flask usada como entrada do desafio `refactor-arch`.
+API de E-commerce em Python/Flask usada como entrada do desafio `refactor-arch`, refatorada para MVC
+(ver `docs/audit-report.md` e `docs/refactor-summary.md`).
 
 ## Como rodar
 
 ```bash
 pip install -r requirements.txt
+cp .env.example .env   # opcional: exporte as variáveis no shell
+export SECRET_KEY=um-valor-aleatorio-longo
 python app.py
 ```
 
-A aplicação sobe em `http://127.0.0.1:5000`. O banco SQLite (`loja.db`) é criado automaticamente no primeiro boot, já com produtos e usuários de exemplo (senhas gravadas como hash).
+A aplicação sobe em `http://127.0.0.1:5000` (`HOST`/`PORT` configuráveis). O banco SQLite (`loja.db`, ou `DATABASE_PATH`)
+é criado automaticamente no primeiro boot, já com produtos e usuários de exemplo (senhas gravadas como hash).
+Bancos antigos com senhas em texto puro são migrados para hash no boot.
 
-## Configuração
+## Autenticação
 
-Toda a configuração vem de variáveis de ambiente; veja `.env.example`. As principais:
+`POST /login` devolve um `token` assinado (validade `TOKEN_MAX_AGE`, padrão 1h). Envie-o nas rotas protegidas:
 
-| Variável | Uso |
+```
+Authorization: Bearer <token>
+```
+
+| Acesso | Rotas |
 |---|---|
-| `SECRET_KEY` | chave do Flask (se ausente, é gerada aleatoriamente a cada boot) |
-| `ADMIN_TOKEN` | exigido no header `X-Admin-Token` em `/admin/*` e `/relatorios/vendas` |
-| `ENABLE_ADMIN_SQL` | habilita `POST /admin/query` (padrão `false`) |
-| `FLASK_DEBUG`, `HOST`, `PORT` | servidor (padrões: `false`, `127.0.0.1`, `5000`) |
-| `CORS_ORIGINS` | origens permitidas, separadas por vírgula (vazio = CORS desabilitado) |
+| Público | `GET /`, `GET /produtos`, `GET /produtos/<id>`, `POST /login` |
+| Autenticado | `GET /produtos/busca`, `GET /health` |
+| Próprio usuário ou admin | `GET /usuarios/<id>`, `GET /pedidos/usuario/<id>`, `POST /pedidos` |
+| Admin | `POST /produtos`, `PUT /produtos/<id>`, `DELETE /produtos/<id>`, `GET /usuarios`, `POST /usuarios`, `GET /pedidos`, `PUT /pedidos/<id>/status`, `GET /relatorios/vendas`, `POST /admin/reset-db`, `POST /admin/query` |
+
+`POST /admin/query` só aceita uma instrução `SELECT`, roda em conexão somente leitura e fica desabilitada
+até `ENABLE_ADMIN_SQL=true`.
+
+Usuários de exemplo: `admin@loja.com` / `admin123` (admin), `joao@email.com` / `123456` (cliente).
 
 ## Estrutura
 
 ```
-app.py              lançador (python app.py)
-src/app.py          composition root (create_app)
-src/config/         settings (env) e constantes de domínio
-src/database/       conexão por requisição, schema e seed
-src/models/         acesso a dados por entidade (SQL parametrizado)
-src/controllers/    casos de uso, validação e regras de negócio
-src/services/       notificações
-src/views/          Blueprints (rotas HTTP)
-src/middlewares/    error handler central e autenticação admin
+app.py              # lançador (python app.py)
+src/app.py          # composition root: create_app()
+src/config/         # settings (variáveis de ambiente) e constantes de domínio
+src/database/       # conexão por requisição, schema, seed
+src/models/         # acesso a dados (SQL parametrizado)
+src/services/       # regras de domínio, tokens e notificações
+src/controllers/    # casos de uso
+src/views/          # Blueprints (HTTP)
+src/middlewares/    # autenticação e error handler central
 ```

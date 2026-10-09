@@ -1,19 +1,32 @@
 @baseUrl = http://localhost:5000
-@adminToken = changeme
+
+# Rotas marcadas com [auth] exigem token. Execute primeiro o "Login como admin".
+
+### Login como admin (execute primeiro — o token é usado nas rotas [auth])
+# @name login
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "admin@loja.com",
+  "senha": "admin123"
+}
 
 ### Índice da API
 GET {{baseUrl}}/
 
-### Health (sem secret_key, db_path ou debug na resposta)
+### Health (sem secret_key, db_path ou debug na resposta) [auth]
 GET {{baseUrl}}/health
+Authorization: Bearer {{login.response.body.token}}
 
 # ---------------------------------------------------------------- Produtos
 
 ### Listar produtos
 GET {{baseUrl}}/produtos
 
-### Buscar produtos com filtros
+### Buscar produtos com filtros [auth]
 GET {{baseUrl}}/produtos/busca?q=Mouse&categoria=informatica&preco_min=10&preco_max=500
+Authorization: Bearer {{login.response.body.token}}
 
 ### Buscar produto por id
 GET {{baseUrl}}/produtos/1
@@ -21,8 +34,9 @@ GET {{baseUrl}}/produtos/1
 ### Produto inexistente → 404
 GET {{baseUrl}}/produtos/999
 
-### Criar produto → 201
+### Criar produto → 201 [auth]
 POST {{baseUrl}}/produtos
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -33,8 +47,9 @@ Content-Type: application/json
   "categoria": "livros"
 }
 
-### Criar produto com preço inválido → 400 (antes: 500)
+### Criar produto com preço inválido → 400 (antes: 500) [auth]
 POST {{baseUrl}}/produtos
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -43,8 +58,9 @@ Content-Type: application/json
   "estoque": 1
 }
 
-### Atualizar produto (mesma validação da criação)
+### Atualizar produto (mesma validação da criação) [auth]
 PUT {{baseUrl}}/produtos/11
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -54,19 +70,23 @@ Content-Type: application/json
   "categoria": "livros"
 }
 
-### Deletar produto
+### Deletar produto [auth]
 DELETE {{baseUrl}}/produtos/11
+Authorization: Bearer {{login.response.body.token}}
 
 # ---------------------------------------------------------------- Usuários
 
-### Listar usuários (campo senha não é mais retornado)
+### Listar usuários (campo senha não é mais retornado) [auth]
 GET {{baseUrl}}/usuarios
+Authorization: Bearer {{login.response.body.token}}
 
-### Buscar usuário por id
+### Buscar usuário por id [auth]
 GET {{baseUrl}}/usuarios/1
+Authorization: Bearer {{login.response.body.token}}
 
-### Criar usuário (senha gravada com hash)
+### Criar usuário (senha gravada com hash) [auth]
 POST {{baseUrl}}/usuarios
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -95,8 +115,9 @@ Content-Type: application/json
 
 # ---------------------------------------------------------------- Pedidos
 
-### Criar pedido → 201 (baixa estoque em transação)
+### Criar pedido → 201 (baixa estoque em transação) [auth]
 POST {{baseUrl}}/pedidos
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -107,8 +128,9 @@ Content-Type: application/json
   ]
 }
 
-### Pedido com quantidade negativa → 400 (antes: aumentava o estoque)
+### Pedido com quantidade negativa → 400 (antes: aumentava o estoque) [auth]
 POST {{baseUrl}}/pedidos
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -116,22 +138,26 @@ Content-Type: application/json
   "itens": [{ "produto_id": 2, "quantidade": -5 }]
 }
 
-### Listar todos os pedidos (sem N+1)
+### Listar todos os pedidos (sem N+1) [auth]
 GET {{baseUrl}}/pedidos
+Authorization: Bearer {{login.response.body.token}}
 
-### Pedidos de um usuário
+### Pedidos de um usuário [auth]
 GET {{baseUrl}}/pedidos/usuario/2
+Authorization: Bearer {{login.response.body.token}}
 
-### Aprovar pedido
+### Aprovar pedido [auth]
 PUT {{baseUrl}}/pedidos/1/status
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
   "status": "aprovado"
 }
 
-### Cancelar pedido (agora devolve o estoque)
+### Cancelar pedido (agora devolve o estoque) [auth]
 PUT {{baseUrl}}/pedidos/1/status
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
@@ -143,13 +169,13 @@ Content-Type: application/json
 ### Relatório de vendas sem token → 401
 GET {{baseUrl}}/relatorios/vendas
 
-### Relatório de vendas com token → 200
+### Relatório de vendas como admin → 200 [auth]
 GET {{baseUrl}}/relatorios/vendas
-X-Admin-Token: {{adminToken}}
+Authorization: Bearer {{login.response.body.token}}
 
-### Executar SQL com token → 403 enquanto ENABLE_ADMIN_SQL=false
+### Executar SQL como admin → 403 enquanto ENABLE_ADMIN_SQL=false [auth]
 POST {{baseUrl}}/admin/query
-X-Admin-Token: {{adminToken}}
+Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 {
