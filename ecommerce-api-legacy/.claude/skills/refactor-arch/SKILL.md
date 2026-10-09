@@ -69,10 +69,11 @@ Leia `references/mvc-guidelines.md` e `references/refactoring-playbook.md`, depo
 5. **Validar** (obrigatório — não declare sucesso sem executar):
    - a) Boot: suba a aplicação com o **comando de start original**; verifique que não há erros/tracebacks no log.
    - b) Endpoints: repita as mesmas requisições do baseline e compare status e chaves. Diferenças só são aceitas se forem mudanças de segurança intencionais (regra 4). Rotas que passaram a exigir credencial são chamadas **duas vezes**: sem credencial (espera `401`/`403`) e com credencial válida (espera o status do baseline).
-   - c) Impacto eliminado, finding a finding: para **cada finding** do relatório (qualquer severidade), reproduza o cenário descrito no Impact e confirme que ele **não acontece mais**. Para findings de autenticação/exposição, chame **cada rota** do `Routes:` sem credencial (espera `401`/`403`) e com credencial válida (espera o status do baseline). Também vale para toda rota citada em finding CRITICAL (mvc-guidelines §6, regra 2). A única exceção aceita é a rota que emite a credencial (login). Um único impacto que ainda se reproduza reprova a validação — corrija antes de seguir.
+   - c) Impacto eliminado, finding a finding: para **cada finding** do relatório (qualquer severidade), reproduza o cenário descrito no Impact e confirme que ele **não acontece mais**. Para findings de autenticação/exposição, chame **cada rota** do `Routes:` sem credencial (espera `401`/`403`) e com credencial válida (espera o status do baseline). Também vale para toda rota citada em finding CRITICAL (mvc-guidelines §6, regra 2). A única exceção aceita é a rota que emite a credencial (login). Findings sem rota HTTP (arquitetura, qualidade, segredos, deprecated) são verificados por evidência: grep do sinal de detecção sem ocorrências, arquivo dividido nas camadas certas, constante nomeada no lugar do literal etc. Um único impacto que ainda se reproduza reprova a validação — corrija antes de seguir.
    - d) Anti-patterns: repita os greps de detecção dos findings CRITICAL/HIGH e confirme que não restam ocorrências.
    - e) Se algo falhar, corrija e valide de novo (até 3 ciclos); se ainda falhar, reporte com honestidade o que ficou pendente.
    - f) Derrube o servidor ao final.
+   - g) **Auto-revisão relatório × código** (antes do relatório final): para cada finding, releia Description, Impact e Recommendation e confirme no código que **tudo** o que a Recommendation pede foi feito, em **todas** as rotas do `Routes:`. Confira também que nenhum item da lista de recomendações residuais aparece no Impact ou no `Routes:` de algum finding — se aparecer, ele não é residual: implemente-o. Só declare a Fase 3 concluída com todos os findings em status `resolvido`.
 6. **Relatório final.** Imprima o bloco abaixo e salve-o também em `docs/refactor-summary.md`:
 
 ```
@@ -83,7 +84,7 @@ PHASE 3: REFACTORING COMPLETE
 <árvore de diretórios, sem dependências/artefatos>
 
 ## Findings addressed
-<tabela: ID do finding | severidade | padrão aplicado (PB-xx) | status>
+<tabela: ID do finding | severidade | padrão aplicado (PB-xx) | rotas tratadas | como o impacto foi verificado | status (resolvido / pendente + motivo)>
 
 ## Intentional contract changes
 <lista (ou "None")>
