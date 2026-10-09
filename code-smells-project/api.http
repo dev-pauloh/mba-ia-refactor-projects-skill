@@ -164,7 +164,7 @@ Content-Type: application/json
   "status": "cancelado"
 }
 
-# ---------------------------------------------------------------- Administrativo (X-Admin-Token = ADMIN_TOKEN)
+# ---------------------------------------------------------------- Administrativo (token de usuário admin, obtido no login)
 
 ### Relatório de vendas sem token → 401
 GET {{baseUrl}}/relatorios/vendas

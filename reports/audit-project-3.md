@@ -182,4 +182,6 @@ Target:  MVC — criar config/, controllers/, services/ de domínio e middleware
 ================================
 Total: 18 findings
 ================================
+
+Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
 ```

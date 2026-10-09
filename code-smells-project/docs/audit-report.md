@@ -1,3 +1,4 @@
+```
 ================================
 ARCHITECTURE AUDIT REPORT
 ================================
@@ -163,3 +164,6 @@ Target:  MVC — separar config, conexão por requisição, models com SQL param
 ================================
 Total: 20 findings
 ================================
+
+Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
+```

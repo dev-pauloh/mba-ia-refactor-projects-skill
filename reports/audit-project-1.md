@@ -2,6 +2,7 @@
 
 > Saída da Fase 2 da skill `/refactor-arch`, executada em `code-smells-project/` (Claude Code 2.1.284, Opus 5.5). Execução com a versão final da skill (recomendação cobre todo o impacto de cada finding).
 
+```
 ================================
 ARCHITECTURE AUDIT REPORT
 ================================
@@ -167,3 +168,6 @@ Target:  MVC — separar config, conexão por requisição, models com SQL param
 ================================
 Total: 20 findings
 ================================
+
+Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
+```

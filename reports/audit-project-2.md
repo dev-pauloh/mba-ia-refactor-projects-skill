@@ -152,4 +152,6 @@ Target:  MVC — desmontar AppManager em config, database, models, services, con
 ================================
 Total: 19 findings
 ================================
+
+Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
 ```
