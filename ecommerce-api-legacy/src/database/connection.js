@@ -1,39 +1,52 @@
 const sqlite3 = require('sqlite3');
 
 class Database {
-    constructor(filename) {
-        this.conn = new sqlite3.Database(filename);
-        this.queue = Promise.resolve();
+    #conn;
+    #transactionQueue = Promise.resolve();
+
+    constructor(conn) {
+        this.#conn = conn;
+    }
+
+    static open(filename) {
+        return new Promise((resolve, reject) => {
+            const conn = new sqlite3.Database(filename, (err) => (err ? reject(err) : resolve(new Database(conn))));
+        });
     }
 
     run(sql, params = []) {
-        return new Promise((resolve, reject) =>
-            this.conn.run(sql, params, function onRun(err) {
+        return new Promise((resolve, reject) => {
+            this.#conn.run(sql, params, function onRun(err) {
                 if (err) reject(err);
                 else resolve({ lastID: this.lastID, changes: this.changes });
-            }));
+            });
+        });
     }
 
     get(sql, params = []) {
-        return new Promise((resolve, reject) =>
-            this.conn.get(sql, params, (err, row) => (err ? reject(err) : resolve(row))));
+        return new Promise((resolve, reject) => {
+            this.#conn.get(sql, params, (err, row) => (err ? reject(err) : resolve(row)));
+        });
     }
 
     all(sql, params = []) {
-        return new Promise((resolve, reject) =>
-            this.conn.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows))));
+        return new Promise((resolve, reject) => {
+            this.#conn.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)));
+        });
     }
 
     exec(sql) {
-        return new Promise((resolve, reject) => this.conn.exec(sql, (err) => (err ? reject(err) : resolve())));
+        return new Promise((resolve, reject) => {
+            this.#conn.exec(sql, (err) => (err ? reject(err) : resolve()));
+        });
     }
 
-    // Transações são serializadas: a conexão SQLite é única e compartilhada.
-    transaction(fn) {
-        const result = this.queue.then(async () => {
+    // Transações são serializadas: a conexão SQLite é única e não suporta BEGIN aninhado.
+    transaction(work) {
+        const result = this.#transactionQueue.then(async () => {
             await this.run('BEGIN');
             try {
-                const value = await fn();
+                const value = await work();
                 await this.run('COMMIT');
                 return value;
             } catch (err) {
@@ -41,19 +54,15 @@ class Database {
                 throw err;
             }
         });
-        this.queue = result.catch(() => {});
+        this.#transactionQueue = result.catch(() => {});
         return result;
     }
 
     close() {
-        return new Promise((resolve, reject) => this.conn.close((err) => (err ? reject(err) : resolve())));
+        return new Promise((resolve, reject) => {
+            this.#conn.close((err) => (err ? reject(err) : resolve()));
+        });
     }
 }
 
-async function createDatabase(filename) {
-    const db = new Database(filename);
-    await db.run('PRAGMA foreign_keys = ON');
-    return db;
-}
-
-module.exports = { Database, createDatabase };
+module.exports = { Database };

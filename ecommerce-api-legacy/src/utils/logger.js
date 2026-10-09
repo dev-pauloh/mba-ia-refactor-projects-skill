@@ -1,12 +1,24 @@
-function write(level, message) {
-    const line = `${new Date().toISOString()} [${level}] ${message}`;
-    if (level === 'ERROR') console.error(line);
-    else if (level === 'WARN') console.warn(line);
-    else console.info(line);
+const LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+
+function createLogger(level = 'info') {
+    const threshold = LEVELS[level] ?? LEVELS.info;
+
+    const write = (name, stream) => (message, ...details) => {
+        if (LEVELS[name] > threshold) return;
+        const line = `${new Date().toISOString()} ${name.toUpperCase()} ${message}`;
+        stream.write(details.length ? `${line} ${details.map(formatDetail).join(' ')}\n` : `${line}\n`);
+    };
+
+    return {
+        error: write('error', process.stderr),
+        warn: write('warn', process.stderr),
+        info: write('info', process.stdout),
+        debug: write('debug', process.stdout),
+    };
 }
 
-module.exports = {
-    info: (message) => write('INFO', message),
-    warn: (message) => write('WARN', message),
-    error: (message, err) => write('ERROR', err ? `${message}: ${err.stack || err}` : message),
-};
+function formatDetail(detail) {
+    return detail instanceof Error ? detail.stack : String(detail);
+}
+
+module.exports = { createLogger };

@@ -1,5 +1,5 @@
 @baseUrl = http://localhost:3000
-@adminToken = changeme
+@adminToken = troque-pelo-ADMIN_API_TOKEN
 
 ### Checkout - sucesso
 POST {{baseUrl}}/api/checkout
@@ -27,8 +27,8 @@ Content-Type: application/json
 
 ### Relatório financeiro administrativo
 GET {{baseUrl}}/api/admin/financial-report
-X-Admin-Token: {{adminToken}}
+Authorization: Bearer {{adminToken}}
 
 ### Deletar usuário
 DELETE {{baseUrl}}/api/users/1
-X-Admin-Token: {{adminToken}}
+Authorization: Bearer {{adminToken}}
