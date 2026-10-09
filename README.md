@@ -186,7 +186,17 @@ Todos os resultados abaixo são da **versão final da skill**, executada nos 3 p
 | 2 — ecommerce-api-legacy | 5 | 6 | 3 | 5 | **19** | [audit-project-2.md](reports/audit-project-2.md) |
 | 3 — task-manager-api | 4 | 3 | 7 | 4 | **18** | [audit-project-3.md](reports/audit-project-3.md) |
 
-Nos 3 projetos, os findings da skill incluem **todos** os problemas da análise manual (seção A). A skill ainda achou problemas que eu não tinha listado:
+### Análise manual × Fase 2 (problemas da seção A encontrados pela skill)
+
+O enunciado pede que a Fase 2 encontre pelo menos 5 dos problemas da análise manual. A skill encontrou **todos**:
+
+| Projeto | Encontrados | Correspondência (problema da seção A → finding do relatório) |
+|---|---|---|
+| 1 — code-smells-project | **15/15** | SQL Injection → F01 · Credenciais hardcoded e vazadas → F05, F04 · Endpoints admin sem auth → F02 · Senhas em texto puro e expostas → F03, F04 · God file → F06, F11 · Estado global mutável → F09 · Efeitos colaterais no controller → F11 · Debug ligado → F08 · N+1 → F12 · Validação duplicada → F14 · Pedido sem transação → F13 · Erro repetido vazando detalhes → F16 · `print` como logging → F20 · Magic numbers → F17 · Imports não usados e nomes ruins → F19, F18 |
+| 2 — ecommerce-api-legacy | **14/14** | Credenciais hardcoded → F02 · Cartão logado → F03 · God Class → F05 · Hash de senha inseguro → F04 · Callback hell com regra na rota → F09, F08 · Estado global mutável → F10 · Endpoints sensíveis sem auth → F01 · N+1 no relatório → F14 · Sem transação/integridade → F12 · Erros ignorados → F13 · Validação fraca → F07 · Nomes crípticos → F16 · Magic values → F15 · Código morto → F17 |
+| 3 — task-manager-api | **13/13** | Credenciais hardcoded → F04 · MD5 sem salt → F03 · Hash exposto na API → F02 · Autenticação falsa → F05 · Sem camada Controller/Service → F07 · Debug ligado → F06 · N+1 → F11 · Lógica duplicada → F12 · `except:` sem tipo → F09 · Validação ausente → F08 · APIs deprecated → F14 · Imports não usados → F17 · Booleanos verbosos e magic numbers → F15 (magic numbers) e F17 (os métodos com booleano verboso, como `validate_status` e `is_admin`, eram código morto e foram removidos) |
+
+A skill ainda achou problemas que eu não tinha listado:
 
 - **P1:** o cancelamento de pedido não devolvia o estoque, `deletar_produto` corrompia o histórico de pedidos e dava para criar pedidos em nome de qualquer usuário.
 - **P2:** o checkout usava uma conta existente sem verificar a senha (quem soubesse o e-mail comprava em nome do aluno), e um `card` numérico derrubava o processo.
